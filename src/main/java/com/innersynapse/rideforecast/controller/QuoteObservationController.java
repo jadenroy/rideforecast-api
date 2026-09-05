@@ -48,7 +48,11 @@ public class QuoteObservationController {
             @RequestParam String marketCountry,
             @RequestParam String provider,
             @RequestParam String rideType,
-            @RequestParam(defaultValue = "30") @Min(1) @Max(365) int days
+            @RequestParam(defaultValue = "30") @Min(1) @Max(365) int days,
+            @RequestParam(required = false) @Positive Double distanceMiles,
+            @RequestParam(required = false) @Positive Double travelMinutes,
+            @RequestParam(required = false) String originZone,
+            @RequestParam(required = false) String destinationZone
     ) {
         return service.benchmark(
                 marketCity,
@@ -56,7 +60,11 @@ public class QuoteObservationController {
                 marketCountry,
                 provider,
                 rideType,
-                days
+                days,
+                distanceMiles,
+                travelMinutes,
+                originZone,
+                destinationZone
         );
     }
 
@@ -68,7 +76,11 @@ public class QuoteObservationController {
             @RequestParam String provider,
             @RequestParam String rideType,
             @RequestParam @Positive double quotedPrice,
-            @RequestParam(defaultValue = "30") @Min(1) @Max(365) int days
+            @RequestParam(defaultValue = "30") @Min(1) @Max(365) int days,
+            @RequestParam(required = false) @Positive Double distanceMiles,
+            @RequestParam(required = false) @Positive Double travelMinutes,
+            @RequestParam(required = false) String originZone,
+            @RequestParam(required = false) String destinationZone
     ) {
         return service.assess(
                 marketCity,
@@ -77,7 +89,11 @@ public class QuoteObservationController {
                 provider,
                 rideType,
                 quotedPrice,
-                days
+                days,
+                distanceMiles,
+                travelMinutes,
+                originZone,
+                destinationZone
         );
     }
 }
