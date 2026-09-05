@@ -11,6 +11,7 @@ public record QuoteAssessmentResponse(
         Double expectedHigh,
         Double percentVsMedian,
         String assessment,
-        String confidence
+        String confidence,
+        String comparisonScope
 ) {
 }
