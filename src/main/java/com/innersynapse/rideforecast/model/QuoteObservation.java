@@ -7,7 +7,10 @@ import java.util.UUID;
 
 @Entity
 @Table(name = "quote_observations", indexes = {
-        @Index(name = "idx_quote_market_provider_type_time", columnList = "marketKey,provider,rideType,observedAt")
+        @Index(
+                name = "idx_quote_market_provider_type_time",
+                columnList = "market_key,provider,ride_type,observed_at"
+        )
 })
 public class QuoteObservation {
 
@@ -17,53 +20,55 @@ public class QuoteObservation {
     @Column(nullable = false)
     private String provider;
 
-    @Column(nullable = false)
+    @Column(name = "ride_type", nullable = false)
     private String rideType;
 
-    @Column(nullable = false)
+    @Column(name = "quoted_price", nullable = false)
     private double quotedPrice;
 
     @Column(nullable = false)
     private String currency;
 
-    @Column(nullable = false)
+    @Column(name = "origin_latitude", nullable = false)
     private double originLatitude;
 
-    @Column(nullable = false)
+    @Column(name = "origin_longitude", nullable = false)
     private double originLongitude;
 
-    @Column(nullable = false)
+    @Column(name = "destination_latitude", nullable = false)
     private double destinationLatitude;
 
-    @Column(nullable = false)
+    @Column(name = "destination_longitude", nullable = false)
     private double destinationLongitude;
 
-    @Column(nullable = false)
+    @Column(name = "market_city", nullable = false)
     private String marketCity;
 
-    @Column(nullable = false)
+    @Column(name = "market_region", nullable = false)
     private String marketRegion;
 
-    @Column(nullable = false)
+    @Column(name = "market_country", nullable = false)
     private String marketCountry;
 
-    @Column(nullable = false)
+    @Column(name = "market_key", nullable = false)
     private String marketKey;
 
+    @Column(name = "origin_zone")
     private String originZone;
 
+    @Column(name = "destination_zone")
     private String destinationZone;
 
-    @Column(nullable = false)
+    @Column(name = "road_distance_miles", nullable = false)
     private double roadDistanceMiles;
 
-    @Column(nullable = false)
+    @Column(name = "travel_minutes", nullable = false)
     private double travelMinutes;
 
-    @Column(nullable = false)
+    @Column(name = "observed_at", nullable = false)
     private Instant observedAt;
 
-    @Column(nullable = false)
+    @Column(name = "created_at", nullable = false)
     private Instant createdAt;
 
     @Column(nullable = false)
