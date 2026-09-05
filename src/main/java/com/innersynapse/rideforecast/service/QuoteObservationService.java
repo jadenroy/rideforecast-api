@@ -78,13 +78,17 @@ public class QuoteObservationService {
             String marketCountry,
             String provider,
             String rideType,
-            int days
+            int days,
+            Double distanceMiles,
+            Double travelMinutes,
+            String originZone,
+            String destinationZone
     ) {
         int boundedDays = Math.max(1, Math.min(days, 365));
         String marketKey = marketKey(marketCity, marketRegion, marketCountry);
         Instant cutoff = Instant.now().minus(boundedDays, ChronoUnit.DAYS);
 
-        List<QuoteObservation> observations = repository
+        List<QuoteObservation> marketObservations = repository
                 .findByMarketKeyAndProviderIgnoreCaseAndRideTypeIgnoreCaseOrderByObservedAtDesc(
                         marketKey,
                         provider,
@@ -93,6 +97,32 @@ public class QuoteObservationService {
                 .stream()
                 .filter(item -> !item.getObservedAt().isBefore(cutoff))
                 .toList();
+
+        String comparisonScope = "MARKET_ONLY";
+        List<QuoteObservation> observations = marketObservations;
+
+        boolean hasTripContext = distanceMiles != null || travelMinutes != null
+                || (originZone != null && !originZone.isBlank())
+                || (destinationZone != null && !destinationZone.isBlank());
+
+        if (hasTripContext && !marketObservations.isEmpty()) {
+            List<QuoteObservation> similar = marketObservations.stream()
+                    .filter(item -> matchesTripContext(
+                            item,
+                            distanceMiles,
+                            travelMinutes,
+                            originZone,
+                            destinationZone
+                    ))
+                    .toList();
+
+            if (similar.size() >= 3) {
+                observations = similar;
+                comparisonScope = "MARKET_AND_SIMILAR_TRIP";
+            } else {
+                comparisonScope = "MARKET_ONLY_FALLBACK";
+            }
+        }
 
         if (observations.isEmpty()) {
             return new MarketBenchmarkResponse(
@@ -104,6 +134,9 @@ public class QuoteObservationService {
                     normalizeDisplay(rideType),
                     boundedDays,
                     0,
+                    distanceMiles,
+                    travelMinutes,
+                    comparisonScope,
                     null,
                     null,
                     null,
@@ -133,6 +166,9 @@ public class QuoteObservationService {
                 observations.getFirst().getRideType(),
                 boundedDays,
                 observations.size(),
+                distanceMiles,
+                travelMinutes,
+                comparisonScope,
                 money(minimum),
                 money(q1),
                 money(average),
@@ -150,7 +186,11 @@ public class QuoteObservationService {
             String provider,
             String rideType,
             double quotedPrice,
-            int days
+            int days,
+            Double distanceMiles,
+            Double travelMinutes,
+            String originZone,
+            String destinationZone
     ) {
         MarketBenchmarkResponse benchmark = benchmark(
                 marketCity,
@@ -158,7 +198,11 @@ public class QuoteObservationService {
                 marketCountry,
                 provider,
                 rideType,
-                days
+                days,
+                distanceMiles,
+                travelMinutes,
+                originZone,
+                destinationZone
         );
 
         if (benchmark.observationCount() == 0 || benchmark.medianPrice() == null) {
@@ -173,7 +217,8 @@ public class QuoteObservationService {
                     null,
                     null,
                     "INSUFFICIENT_DATA",
-                    "NO_DATA"
+                    "NO_DATA",
+                    benchmark.comparisonScope()
             );
         }
 
@@ -199,8 +244,45 @@ public class QuoteObservationService {
                 benchmark.expectedHigh(),
                 money(percentVsMedian),
                 assessment,
-                benchmark.confidence()
+                benchmark.confidence(),
+                benchmark.comparisonScope()
         );
+    }
+
+    private boolean matchesTripContext(
+            QuoteObservation item,
+            Double distanceMiles,
+            Double travelMinutes,
+            String originZone,
+            String destinationZone
+    ) {
+        if (distanceMiles != null) {
+            double tolerance = Math.max(1.0, distanceMiles * 0.35);
+            if (Math.abs(item.getRoadDistanceMiles() - distanceMiles) > tolerance) {
+                return false;
+            }
+        }
+
+        if (travelMinutes != null) {
+            double tolerance = Math.max(5.0, travelMinutes * 0.40);
+            if (Math.abs(item.getTravelMinutes() - travelMinutes) > tolerance) {
+                return false;
+            }
+        }
+
+        if (originZone != null && !originZone.isBlank()) {
+            if (item.getOriginZone() == null || !item.getOriginZone().equalsIgnoreCase(originZone.trim())) {
+                return false;
+            }
+        }
+
+        if (destinationZone != null && !destinationZone.isBlank()) {
+            if (item.getDestinationZone() == null || !item.getDestinationZone().equalsIgnoreCase(destinationZone.trim())) {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     private QuoteObservationResponse toResponse(QuoteObservation item) {
