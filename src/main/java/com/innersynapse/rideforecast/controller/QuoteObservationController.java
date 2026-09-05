@@ -1,12 +1,14 @@
 package com.innersynapse.rideforecast.controller;
 
 import com.innersynapse.rideforecast.dto.MarketBenchmarkResponse;
+import com.innersynapse.rideforecast.dto.QuoteAssessmentResponse;
 import com.innersynapse.rideforecast.dto.QuoteObservationRequest;
 import com.innersynapse.rideforecast.dto.QuoteObservationResponse;
 import com.innersynapse.rideforecast.service.QuoteObservationService;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.Positive;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
@@ -54,6 +56,27 @@ public class QuoteObservationController {
                 marketCountry,
                 provider,
                 rideType,
+                days
+        );
+    }
+
+    @GetMapping("/assess")
+    public QuoteAssessmentResponse assess(
+            @RequestParam String marketCity,
+            @RequestParam String marketRegion,
+            @RequestParam String marketCountry,
+            @RequestParam String provider,
+            @RequestParam String rideType,
+            @RequestParam @Positive double quotedPrice,
+            @RequestParam(defaultValue = "30") @Min(1) @Max(365) int days
+    ) {
+        return service.assess(
+                marketCity,
+                marketRegion,
+                marketCountry,
+                provider,
+                rideType,
+                quotedPrice,
                 days
         );
     }
