@@ -1,6 +1,7 @@
 package com.innersynapse.rideforecast.service;
 
 import com.innersynapse.rideforecast.dto.MarketBenchmarkResponse;
+import com.innersynapse.rideforecast.dto.QuoteAssessmentResponse;
 import com.innersynapse.rideforecast.dto.QuoteObservationRequest;
 import com.innersynapse.rideforecast.dto.QuoteObservationResponse;
 import com.innersynapse.rideforecast.model.QuoteObservation;
@@ -139,6 +140,66 @@ public class QuoteObservationService {
                 money(q3),
                 money(maximum),
                 confidence(observations.size())
+        );
+    }
+
+    public QuoteAssessmentResponse assess(
+            String marketCity,
+            String marketRegion,
+            String marketCountry,
+            String provider,
+            String rideType,
+            double quotedPrice,
+            int days
+    ) {
+        MarketBenchmarkResponse benchmark = benchmark(
+                marketCity,
+                marketRegion,
+                marketCountry,
+                provider,
+                rideType,
+                days
+        );
+
+        if (benchmark.observationCount() == 0 || benchmark.medianPrice() == null) {
+            return new QuoteAssessmentResponse(
+                    normalizeDisplay(provider),
+                    normalizeDisplay(rideType),
+                    money(quotedPrice),
+                    benchmark.marketKey(),
+                    0,
+                    null,
+                    null,
+                    null,
+                    null,
+                    "INSUFFICIENT_DATA",
+                    "NO_DATA"
+            );
+        }
+
+        double percentVsMedian = ((quotedPrice - benchmark.medianPrice()) / benchmark.medianPrice()) * 100;
+        String assessment;
+
+        if (benchmark.expectedLow() != null && quotedPrice < benchmark.expectedLow()) {
+            assessment = "BELOW_LOCAL_NORM";
+        } else if (benchmark.expectedHigh() != null && quotedPrice > benchmark.expectedHigh()) {
+            assessment = "ABOVE_LOCAL_NORM";
+        } else {
+            assessment = "WITHIN_LOCAL_NORM";
+        }
+
+        return new QuoteAssessmentResponse(
+                normalizeDisplay(provider),
+                normalizeDisplay(rideType),
+                money(quotedPrice),
+                benchmark.marketKey(),
+                benchmark.observationCount(),
+                benchmark.expectedLow(),
+                benchmark.medianPrice(),
+                benchmark.expectedHigh(),
+                money(percentVsMedian),
+                assessment,
+                benchmark.confidence()
         );
     }
 
