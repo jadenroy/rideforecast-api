@@ -1,0 +1,7 @@
+services:
+  - type: web
+    name: rideforecast-api
+    runtime: docker
+    plan: free
+    healthCheckPath: /health
+    autoDeploy: true
