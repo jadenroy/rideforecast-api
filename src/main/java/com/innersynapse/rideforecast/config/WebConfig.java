@@ -9,7 +9,7 @@ import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 public class WebConfig implements WebMvcConfigurer {
     private final String[] allowedOrigins;
 
-    public WebConfig(@Value("${app.cors.allowed-origins:https://rideforecast.innersynapse.com,http://localhost:5173}") String[] allowedOrigins) {
+    public WebConfig(@Value("${app.cors.allowed-origins:https://rideforecast.innersynapse.com,http://localhost:5173,http://127.0.0.1:5173}") String[] allowedOrigins) {
         this.allowedOrigins = allowedOrigins;
     }
 
