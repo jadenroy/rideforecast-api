@@ -1,0 +1,26 @@
+name: RideForecast API CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+      - market-quote-calibration
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Java 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+
+      - name: Run tests
+        run: mvn --batch-mode test
