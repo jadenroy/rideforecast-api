@@ -4,6 +4,7 @@ import com.innersynapse.rideforecast.model.QuoteObservation;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 public interface QuoteObservationRepository extends JpaRepository<QuoteObservation, UUID> {
@@ -15,4 +16,6 @@ public interface QuoteObservationRepository extends JpaRepository<QuoteObservati
     );
 
     List<QuoteObservation> findTop100ByMarketKeyOrderByObservedAtDesc(String marketKey);
+
+    Optional<QuoteObservation> findBySubmissionKey(String submissionKey);
 }

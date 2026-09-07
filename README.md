@@ -20,6 +20,16 @@ Returns the current server-side simulated Uber/Lyft prices for a trip.
 
 Stores a quote a user actually saw in a provider app. The record includes provider, ride type, quoted price, origin/destination coordinates, local market, optional zones, road distance, ETA, observation time, and source.
 
+Public submissions are protected by:
+
+- `Idempotency-Key`: the web app reuses one key when retrying the same save. A new observation returns `201` with `Idempotency-Replayed: false`; a safe replay returns the original observation with `200` and `Idempotency-Replayed: true`.
+- Persistent payload fingerprints: clients without the header still receive duplicate protection for an identical payload, including across API restarts.
+- Server validation: prices are limited to `$0.01–$10,000`, coordinates must be valid, distance is limited to `1,000` miles, ETA is limited to `1,440` minutes, providers and currency codes are validated, and future observation times are rejected.
+- Rate limiting: the API accepts at most 12 quote attempts per client per minute by default. Configure `QUOTE_SUBMISSION_MAX_PER_MINUTE` to change that limit. Rate-limited requests return `429`, `Retry-After`, and a structured error.
+- A hidden `website` honeypot field: non-empty values are rejected as automated submissions.
+
+The rate-limit window is held by the running API instance. PostgreSQL idempotency is the durable layer that prevents repeated saves after a restart.
+
 Example:
 
 ```json
@@ -39,7 +49,8 @@ Example:
   "destinationZone": "Airport",
   "roadDistanceMiles": 10.4,
   "travelMinutes": 18,
-  "source": "user-observed"
+  "source": "user-observed",
+  "website": ""
 }
 ```
 

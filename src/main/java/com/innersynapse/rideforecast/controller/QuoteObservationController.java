@@ -4,12 +4,15 @@ import com.innersynapse.rideforecast.dto.MarketBenchmarkResponse;
 import com.innersynapse.rideforecast.dto.QuoteAssessmentResponse;
 import com.innersynapse.rideforecast.dto.QuoteObservationRequest;
 import com.innersynapse.rideforecast.dto.QuoteObservationResponse;
+import com.innersynapse.rideforecast.dto.QuoteSaveResult;
 import com.innersynapse.rideforecast.service.QuoteObservationService;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.Positive;
 import org.springframework.validation.annotation.Validated;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -26,10 +29,15 @@ public class QuoteObservationController {
     }
 
     @PostMapping
-    public QuoteObservationResponse create(
-            @Valid @RequestBody QuoteObservationRequest request
+    public ResponseEntity<QuoteObservationResponse> create(
+            @Valid @RequestBody QuoteObservationRequest request,
+            @RequestHeader(value = "Idempotency-Key", required = false) String idempotencyKey
     ) {
-        return service.save(request);
+        QuoteSaveResult result = service.save(request, idempotencyKey);
+        return ResponseEntity
+                .status(result.replayed() ? HttpStatus.OK : HttpStatus.CREATED)
+                .header("Idempotency-Replayed", Boolean.toString(result.replayed()))
+                .body(result.observation());
     }
 
     @GetMapping("/recent")

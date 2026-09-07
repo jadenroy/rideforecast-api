@@ -18,7 +18,13 @@ public class WebConfig implements WebMvcConfigurer {
         registry.addMapping("/v1/quotes/**")
                 .allowedOrigins(allowedOrigins)
                 .allowedMethods("GET", "POST", "OPTIONS")
-                .allowedHeaders("Content-Type")
+                .allowedHeaders("Content-Type", "Idempotency-Key")
+                .exposedHeaders(
+                        "Idempotency-Replayed",
+                        "X-RateLimit-Limit",
+                        "X-RateLimit-Remaining",
+                        "Retry-After"
+                )
                 .maxAge(3600);
     }
 }

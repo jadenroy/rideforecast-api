@@ -18,9 +18,10 @@ class WebCorsTests {
             .perform(options("/v1/quotes")
                 .header("Origin", "https://rideforecast.app")
                 .header("Access-Control-Request-Method", "POST")
-                .header("Access-Control-Request-Headers", "content-type"))
+                .header("Access-Control-Request-Headers", "content-type,idempotency-key"))
             .andExpect(status().isOk())
-            .andExpect(header().string("Access-Control-Allow-Origin", "https://rideforecast.app"));
+            .andExpect(header().string("Access-Control-Allow-Origin", "https://rideforecast.app"))
+            .andExpect(header().string("Access-Control-Allow-Headers", org.hamcrest.Matchers.containsStringIgnoringCase("idempotency-key")));
     }
 
     @Test
