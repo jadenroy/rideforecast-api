@@ -4,22 +4,32 @@ import com.innersynapse.rideforecast.dto.MarketBenchmarkResponse;
 import com.innersynapse.rideforecast.dto.QuoteAssessmentResponse;
 import com.innersynapse.rideforecast.dto.QuoteObservationRequest;
 import com.innersynapse.rideforecast.dto.QuoteObservationResponse;
+import com.innersynapse.rideforecast.dto.QuoteSaveResult;
+import com.innersynapse.rideforecast.exception.InvalidQuoteSubmissionException;
 import com.innersynapse.rideforecast.model.QuoteObservation;
 import com.innersynapse.rideforecast.repository.QuoteObservationRepository;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HexFormat;
 import java.util.List;
 import java.util.Locale;
 import java.util.UUID;
+import java.util.regex.Pattern;
 
 @Service
 public class QuoteObservationService {
+
+    private static final Pattern IDEMPOTENCY_KEY = Pattern.compile("[A-Za-z0-9._:-]{8,100}");
 
     private final QuoteObservationRepository repository;
 
@@ -27,12 +37,32 @@ public class QuoteObservationService {
         this.repository = repository;
     }
 
-    public QuoteObservationResponse save(QuoteObservationRequest request) {
+    public QuoteSaveResult save(QuoteObservationRequest request, String requestedIdempotencyKey) {
+        if (request.website() != null && !request.website().isBlank()) {
+            throw new InvalidQuoteSubmissionException(
+                    "AUTOMATED_SUBMISSION_REJECTED",
+                    "The quote submission could not be accepted."
+            );
+        }
+
         String marketKey = marketKey(request.marketCity(), request.marketRegion(), request.marketCountry());
         Instant observedAt = request.observedAt() == null ? Instant.now() : request.observedAt();
+        if (observedAt.isAfter(Instant.now().plus(5, ChronoUnit.MINUTES))) {
+            throw new InvalidQuoteSubmissionException(
+                    "FUTURE_OBSERVATION",
+                    "Observation time cannot be in the future."
+            );
+        }
         String source = request.source() == null || request.source().isBlank()
                 ? "user-observed"
                 : request.source().trim();
+        String fingerprint = fingerprint(request, observedAt, marketKey, source);
+        String submissionKey = submissionKey(requestedIdempotencyKey, fingerprint);
+
+        QuoteObservation existing = repository.findBySubmissionKey(submissionKey).orElse(null);
+        if (existing != null) {
+            return replay(existing, fingerprint);
+        }
 
         QuoteObservation observation = new QuoteObservation(
                 UUID.randomUUID(),
@@ -54,10 +84,78 @@ public class QuoteObservationService {
                 request.travelMinutes(),
                 observedAt,
                 Instant.now(),
-                source
+                source,
+                submissionKey,
+                fingerprint
         );
 
-        return toResponse(repository.save(observation));
+        try {
+            return new QuoteSaveResult(toResponse(repository.saveAndFlush(observation)), false);
+        } catch (DataIntegrityViolationException conflict) {
+            QuoteObservation concurrent = repository.findBySubmissionKey(submissionKey)
+                    .orElseThrow(() -> conflict);
+            return replay(concurrent, fingerprint);
+        }
+    }
+
+    private QuoteSaveResult replay(QuoteObservation existing, String fingerprint) {
+        if (existing.getSubmissionFingerprint() != null
+                && !existing.getSubmissionFingerprint().equals(fingerprint)) {
+            throw new InvalidQuoteSubmissionException(
+                    "IDEMPOTENCY_KEY_REUSED",
+                    "This submission key was already used for different quote details."
+            );
+        }
+        return new QuoteSaveResult(toResponse(existing), true);
+    }
+
+    private String submissionKey(String requested, String fingerprint) {
+        if (requested == null || requested.isBlank()) {
+            return "auto:" + fingerprint;
+        }
+        String normalized = requested.trim();
+        if (!IDEMPOTENCY_KEY.matcher(normalized).matches()) {
+            throw new InvalidQuoteSubmissionException(
+                    "INVALID_IDEMPOTENCY_KEY",
+                    "The submission key contains unsupported characters or has an invalid length."
+            );
+        }
+        return normalized;
+    }
+
+    private String fingerprint(
+            QuoteObservationRequest request,
+            Instant observedAt,
+            String marketKey,
+            String source
+    ) {
+        String canonical = String.join("\n",
+                normalizeKey(request.provider()),
+                normalizeKey(request.rideType()),
+                decimal(money(request.quotedPrice())),
+                request.currency().trim().toUpperCase(Locale.ROOT),
+                decimal(request.originLatitude()),
+                decimal(request.originLongitude()),
+                decimal(request.destinationLatitude()),
+                decimal(request.destinationLongitude()),
+                marketKey,
+                normalizeKey(request.originZone()),
+                normalizeKey(request.destinationZone()),
+                decimal(request.roadDistanceMiles()),
+                decimal(request.travelMinutes()),
+                observedAt.truncatedTo(ChronoUnit.MILLIS).toString(),
+                source
+        );
+        try {
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            return HexFormat.of().formatHex(digest.digest(canonical.getBytes(StandardCharsets.UTF_8)));
+        } catch (NoSuchAlgorithmException impossible) {
+            throw new IllegalStateException("SHA-256 is unavailable", impossible);
+        }
+    }
+
+    private String decimal(double value) {
+        return BigDecimal.valueOf(value).stripTrailingZeros().toPlainString();
     }
 
     public List<QuoteObservationResponse> recent(

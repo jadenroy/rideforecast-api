@@ -10,6 +10,11 @@ import java.util.UUID;
         @Index(
                 name = "idx_quote_market_provider_type_time",
                 columnList = "market_key,provider,ride_type,observed_at"
+        ),
+        @Index(
+                name = "idx_quote_submission_key",
+                columnList = "submission_key",
+                unique = true
         )
 })
 public class QuoteObservation {
@@ -74,6 +79,12 @@ public class QuoteObservation {
     @Column(nullable = false)
     private String source;
 
+    @Column(name = "submission_key", length = 100)
+    private String submissionKey;
+
+    @Column(name = "submission_fingerprint", length = 64)
+    private String submissionFingerprint;
+
     protected QuoteObservation() {
     }
 
@@ -97,7 +108,9 @@ public class QuoteObservation {
             double travelMinutes,
             Instant observedAt,
             Instant createdAt,
-            String source
+            String source,
+            String submissionKey,
+            String submissionFingerprint
     ) {
         this.id = id;
         this.provider = provider;
@@ -119,6 +132,8 @@ public class QuoteObservation {
         this.observedAt = observedAt;
         this.createdAt = createdAt;
         this.source = source;
+        this.submissionKey = submissionKey;
+        this.submissionFingerprint = submissionFingerprint;
     }
 
     public UUID getId() { return id; }
@@ -141,4 +156,6 @@ public class QuoteObservation {
     public Instant getObservedAt() { return observedAt; }
     public Instant getCreatedAt() { return createdAt; }
     public String getSource() { return source; }
+    public String getSubmissionKey() { return submissionKey; }
+    public String getSubmissionFingerprint() { return submissionFingerprint; }
 }
