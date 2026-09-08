@@ -18,4 +18,8 @@ public interface QuoteObservationRepository extends JpaRepository<QuoteObservati
     List<QuoteObservation> findTop100ByMarketKeyOrderByObservedAtDesc(String marketKey);
 
     Optional<QuoteObservation> findBySubmissionKey(String submissionKey);
+
+    List<QuoteObservation> findTop100ByOwnerIdOrderByObservedAtDesc(UUID ownerId);
+
+    void deleteByOwnerId(UUID ownerId);
 }

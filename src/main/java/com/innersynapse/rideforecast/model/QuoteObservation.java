@@ -85,6 +85,9 @@ public class QuoteObservation {
     @Column(name = "submission_fingerprint", length = 64)
     private String submissionFingerprint;
 
+    @Column(name = "owner_id")
+    private UUID ownerId;
+
     protected QuoteObservation() {
     }
 
@@ -110,7 +113,8 @@ public class QuoteObservation {
             Instant createdAt,
             String source,
             String submissionKey,
-            String submissionFingerprint
+            String submissionFingerprint,
+            UUID ownerId
     ) {
         this.id = id;
         this.provider = provider;
@@ -134,6 +138,7 @@ public class QuoteObservation {
         this.source = source;
         this.submissionKey = submissionKey;
         this.submissionFingerprint = submissionFingerprint;
+        this.ownerId = ownerId;
     }
 
     public UUID getId() { return id; }
@@ -158,4 +163,5 @@ public class QuoteObservation {
     public String getSource() { return source; }
     public String getSubmissionKey() { return submissionKey; }
     public String getSubmissionFingerprint() { return submissionFingerprint; }
+    public UUID getOwnerId() { return ownerId; }
 }

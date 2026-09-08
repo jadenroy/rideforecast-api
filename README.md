@@ -89,6 +89,12 @@ The API also returns the percent difference from the local median, observation c
 
 RideForecast should describe these results as observed-market price intelligence, not proof that a provider is deceptive or fraudulent. The benchmark answers: **"How unusual is this quote compared with recent comparable observations in this market?"**
 
+## Accounts and profiles
+
+The account foundation uses Firebase Authentication for identity verification and PostgreSQL for RideForecast-owned profile data. Private endpoints are `GET`, `PUT`, and `DELETE /v1/profile`, plus `GET /v1/profile/quotes`. A valid Firebase ID token must be sent as `Authorization: Bearer <token>`. Signed-in quote saves are attached to that profile; public market responses never expose ownership.
+
+Production variables are `AUTH_ENABLED`, `ALLOW_ANONYMOUS_QUOTES`, and the secret `FIREBASE_SERVICE_ACCOUNT_JSON`. Defaults preserve the current guest beta until provider acceptance is complete. See [AUTHENTICATION.md](AUTHENTICATION.md) and the web repository's release checklist.
+
 ## Persistence
 
 The app supports PostgreSQL through environment variables:

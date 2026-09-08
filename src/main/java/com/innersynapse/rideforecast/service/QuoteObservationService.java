@@ -37,7 +37,7 @@ public class QuoteObservationService {
         this.repository = repository;
     }
 
-    public QuoteSaveResult save(QuoteObservationRequest request, String requestedIdempotencyKey) {
+    public QuoteSaveResult save(QuoteObservationRequest request, String requestedIdempotencyKey, UUID ownerId) {
         if (request.website() != null && !request.website().isBlank()) {
             throw new InvalidQuoteSubmissionException(
                     "AUTOMATED_SUBMISSION_REJECTED",
@@ -86,7 +86,8 @@ public class QuoteObservationService {
                 Instant.now(),
                 source,
                 submissionKey,
-                fingerprint
+                fingerprint,
+                ownerId
         );
 
         try {
@@ -165,6 +166,13 @@ public class QuoteObservationService {
     ) {
         String marketKey = marketKey(marketCity, marketRegion, marketCountry);
         return repository.findTop100ByMarketKeyOrderByObservedAtDesc(marketKey)
+                .stream()
+                .map(this::toResponse)
+                .toList();
+    }
+
+    public List<QuoteObservationResponse> recentByOwner(UUID ownerId) {
+        return repository.findTop100ByOwnerIdOrderByObservedAtDesc(ownerId)
                 .stream()
                 .map(this::toResponse)
                 .toList();
