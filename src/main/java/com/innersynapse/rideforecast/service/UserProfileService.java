@@ -53,7 +53,10 @@ public class UserProfileService {
 
     @Transactional
     public void delete(String firebaseUid) {
-        UserProfile profile = require(firebaseUid);
+        UserProfile profile = find(firebaseUid).orElse(null);
+        if (profile == null) {
+            return;
+        }
         quotes.deleteByOwnerId(profile.getId());
         profiles.delete(profile);
     }

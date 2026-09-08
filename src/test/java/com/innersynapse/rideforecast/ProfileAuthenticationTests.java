@@ -166,6 +166,10 @@ class ProfileAuthenticationTests {
 
         assertThat(profiles.count()).isZero();
         assertThat(quotes.count()).isZero();
+
+        mvc.perform(delete("/v1/profile").header("Authorization", "Bearer jaden-token"))
+                .andExpect(status().isNoContent())
+                .andExpect(content().string(""));
     }
 
     private String profileBody(String preferredName, String city) {
