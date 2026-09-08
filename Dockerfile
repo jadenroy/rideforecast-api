@@ -12,7 +12,12 @@ FROM eclipse-temurin:21-jre
 
 WORKDIR /app
 
-COPY --from=build /app/target/*.jar app.jar
+RUN groupadd --system rideforecast \
+    && useradd --system --gid rideforecast --no-create-home --shell /usr/sbin/nologin rideforecast
+
+COPY --from=build --chown=rideforecast:rideforecast /app/target/*.jar app.jar
+
+USER rideforecast
 
 EXPOSE 8080
 

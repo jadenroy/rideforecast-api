@@ -135,8 +135,11 @@ class ProfileAuthenticationTests {
                         .content(quoteBody()))
                 .andExpect(status().isCreated());
 
-        assertThat(quotes.findAll()).singleElement().satisfies(quote ->
-                assertThat(quote.getOwnerId()).isNotNull());
+        assertThat(quotes.findAll()).singleElement().satisfies(quote -> {
+            assertThat(quote.getOwnerId()).isNotNull();
+            assertThat(quote.getOriginLatitude()).isEqualTo(35.08);
+            assertThat(quote.getOriginLongitude()).isEqualTo(-106.65);
+        });
 
         mvc.perform(get("/v1/profile/quotes").header("Authorization", "Bearer jaden-token"))
                 .andExpect(status().isOk())
@@ -144,6 +147,13 @@ class ProfileAuthenticationTests {
 
         mvc.perform(get("/v1/profile/quotes").header("Authorization", "Bearer other-token"))
                 .andExpect(status().isNotFound());
+
+        mvc.perform(delete("/v1/profile").header("Authorization", "Bearer stale-jaden-token"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("REAUTHENTICATION_REQUIRED"));
+
+        assertThat(profiles.count()).isEqualTo(1);
+        assertThat(quotes.count()).isEqualTo(1);
 
         mvc.perform(delete("/v1/profile").header("Authorization", "Bearer jaden-token"))
                 .andExpect(status().isNoContent())
@@ -164,8 +174,8 @@ class ProfileAuthenticationTests {
     private String quoteBody() {
         return """
                 {"provider":"Uber","rideType":"UberX","quotedPrice":16.95,"currency":"USD",
-                 "originLatitude":35.08,"originLongitude":-106.65,"destinationLatitude":35.12,
-                 "destinationLongitude":-106.57,"marketCity":"Albuquerque","marketRegion":"NM",
+                 "originLatitude":35.08049,"originLongitude":-106.65049,"destinationLatitude":35.12049,
+                 "destinationLongitude":-106.57049,"marketCity":"Albuquerque","marketRegion":"NM",
                  "marketCountry":"US","originZone":"Downtown","destinationZone":"Uptown",
                  "roadDistanceMiles":6.2,"travelMinutes":18,"observedAt":"%s",
                  "source":"user-observed-web","website":""}
@@ -178,8 +188,10 @@ class ProfileAuthenticationTests {
         @Primary
         FirebaseTokenVerifier testTokenVerifier() {
             return token -> switch (token) {
-                case "jaden-token" -> new VerifiedIdentity("firebase-jaden");
-                case "other-token" -> new VerifiedIdentity("firebase-other");
+                case "jaden-token" -> new VerifiedIdentity("firebase-jaden", Instant.now());
+                case "stale-jaden-token" -> new VerifiedIdentity(
+                        "firebase-jaden", Instant.now().minus(10, ChronoUnit.MINUTES));
+                case "other-token" -> new VerifiedIdentity("firebase-other", Instant.now());
                 default -> throw new InvalidAuthenticationException(
                         "INVALID_AUTH_TOKEN", "Your sign-in expired or could not be verified.");
             };

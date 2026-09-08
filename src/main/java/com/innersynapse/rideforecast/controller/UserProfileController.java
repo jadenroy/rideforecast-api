@@ -19,6 +19,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
+import java.time.Duration;
 
 @RestController
 @RequestMapping("/v1/profile")
@@ -50,7 +51,8 @@ public class UserProfileController {
 
     @DeleteMapping
     public ResponseEntity<Void> delete(HttpServletRequest request) {
-        profiles.delete(AuthenticatedRequest.require(request).uid());
+        VerifiedIdentity identity = AuthenticatedRequest.requireRecent(request, Duration.ofMinutes(5));
+        profiles.delete(identity.uid());
         return ResponseEntity.noContent().build();
     }
 }

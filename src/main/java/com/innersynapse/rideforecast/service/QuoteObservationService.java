@@ -70,10 +70,10 @@ public class QuoteObservationService {
                 normalizeDisplay(request.rideType()),
                 money(request.quotedPrice()),
                 request.currency().trim().toUpperCase(Locale.ROOT),
-                request.originLatitude(),
-                request.originLongitude(),
-                request.destinationLatitude(),
-                request.destinationLongitude(),
+                coordinate(request.originLatitude()),
+                coordinate(request.originLongitude()),
+                coordinate(request.destinationLatitude()),
+                coordinate(request.destinationLongitude()),
                 normalizeDisplay(request.marketCity()),
                 normalizeDisplay(request.marketRegion()),
                 normalizeDisplay(request.marketCountry()),
@@ -135,10 +135,10 @@ public class QuoteObservationService {
                 normalizeKey(request.rideType()),
                 decimal(money(request.quotedPrice())),
                 request.currency().trim().toUpperCase(Locale.ROOT),
-                decimal(request.originLatitude()),
-                decimal(request.originLongitude()),
-                decimal(request.destinationLatitude()),
-                decimal(request.destinationLongitude()),
+                decimal(coordinate(request.originLatitude())),
+                decimal(coordinate(request.originLongitude())),
+                decimal(coordinate(request.destinationLatitude())),
+                decimal(coordinate(request.destinationLongitude())),
                 marketKey,
                 normalizeKey(request.originZone()),
                 normalizeKey(request.destinationZone()),
@@ -157,6 +157,10 @@ public class QuoteObservationService {
 
     private String decimal(double value) {
         return BigDecimal.valueOf(value).stripTrailingZeros().toPlainString();
+    }
+
+    private double coordinate(double value) {
+        return BigDecimal.valueOf(value).setScale(3, RoundingMode.HALF_UP).doubleValue();
     }
 
     public List<QuoteObservationResponse> recent(
