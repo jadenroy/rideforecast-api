@@ -1,5 +1,6 @@
 package com.innersynapse.rideforecast.auth;
 
+import com.innersynapse.rideforecast.dto.ApiErrorResponse;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -8,6 +9,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
+import tools.jackson.databind.ObjectMapper;
 
 import java.io.IOException;
 
@@ -16,13 +18,16 @@ public class FirebaseAuthenticationFilter extends OncePerRequestFilter {
     public static final String IDENTITY_ATTRIBUTE = FirebaseAuthenticationFilter.class.getName() + ".identity";
 
     private final FirebaseTokenVerifier verifier;
+    private final ObjectMapper objectMapper;
     private final boolean enabled;
 
     public FirebaseAuthenticationFilter(
             FirebaseTokenVerifier verifier,
+            ObjectMapper objectMapper,
             @Value("${rideforecast.auth.enabled:false}") boolean enabled
     ) {
         this.verifier = verifier;
+        this.objectMapper = objectMapper;
         this.enabled = enabled;
     }
 
@@ -57,7 +62,6 @@ public class FirebaseAuthenticationFilter extends OncePerRequestFilter {
     private void unauthorized(HttpServletResponse response, String code, String message) throws IOException {
         response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
         response.setContentType(MediaType.APPLICATION_JSON_VALUE);
-        response.getWriter().write("{\"code\":\"%s\",\"message\":\"%s\",\"fieldErrors\":{}}"
-                .formatted(code, message));
+        objectMapper.writeValue(response.getWriter(), ApiErrorResponse.of(code, message));
     }
 }

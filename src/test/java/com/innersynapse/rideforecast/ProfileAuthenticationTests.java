@@ -64,6 +64,11 @@ class ProfileAuthenticationTests {
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.code").value("INVALID_AUTH_TOKEN"));
 
+        mvc.perform(get("/v1/profile").header("Authorization", "Bearer unsafe-message-token"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("INVALID_AUTH_TOKEN"))
+                .andExpect(jsonPath("$.message").value("Signed out \"now\".\nRetry."));
+
         mvc.perform(get("/v1/profile").header("Authorization", "Bearer jaden-token"))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.code").value("PROFILE_NOT_FOUND"));
@@ -192,6 +197,8 @@ class ProfileAuthenticationTests {
                 case "stale-jaden-token" -> new VerifiedIdentity(
                         "firebase-jaden", Instant.now().minus(10, ChronoUnit.MINUTES));
                 case "other-token" -> new VerifiedIdentity("firebase-other", Instant.now());
+                case "unsafe-message-token" -> throw new InvalidAuthenticationException(
+                        "INVALID_AUTH_TOKEN", "Signed out \"now\".\nRetry.");
                 default -> throw new InvalidAuthenticationException(
                         "INVALID_AUTH_TOKEN", "Your sign-in expired or could not be verified.");
             };
