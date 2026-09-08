@@ -1,4 +1,6 @@
 package com.innersynapse.rideforecast.auth;
 
-public record VerifiedIdentity(String uid) {
+import java.time.Instant;
+
+public record VerifiedIdentity(String uid, Instant authenticatedAt) {
 }

@@ -16,7 +16,10 @@ import org.springframework.beans.factory.annotation.Value;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Positive;
+import jakarta.validation.constraints.Size;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -61,25 +64,25 @@ public class QuoteObservationController {
 
     @GetMapping("/recent")
     public List<QuoteObservationResponse> recent(
-            @RequestParam String marketCity,
-            @RequestParam String marketRegion,
-            @RequestParam String marketCountry
+            @RequestParam @NotBlank @Size(max = 120) String marketCity,
+            @RequestParam @NotBlank @Size(max = 120) String marketRegion,
+            @RequestParam @NotBlank @Size(max = 80) String marketCountry
     ) {
         return service.recent(marketCity, marketRegion, marketCountry);
     }
 
     @GetMapping("/benchmark")
     public MarketBenchmarkResponse benchmark(
-            @RequestParam String marketCity,
-            @RequestParam String marketRegion,
-            @RequestParam String marketCountry,
-            @RequestParam String provider,
-            @RequestParam String rideType,
+            @RequestParam @NotBlank @Size(max = 120) String marketCity,
+            @RequestParam @NotBlank @Size(max = 120) String marketRegion,
+            @RequestParam @NotBlank @Size(max = 80) String marketCountry,
+            @RequestParam @Pattern(regexp = "(?i)Uber|Lyft|Waymo|Tesla") String provider,
+            @RequestParam @NotBlank @Size(max = 80) String rideType,
             @RequestParam(defaultValue = "30") @Min(1) @Max(365) int days,
             @RequestParam(required = false) @Positive Double distanceMiles,
             @RequestParam(required = false) @Positive Double travelMinutes,
-            @RequestParam(required = false) String originZone,
-            @RequestParam(required = false) String destinationZone
+            @RequestParam(required = false) @Size(max = 120) String originZone,
+            @RequestParam(required = false) @Size(max = 120) String destinationZone
     ) {
         return service.benchmark(
                 marketCity,
@@ -97,17 +100,17 @@ public class QuoteObservationController {
 
     @GetMapping("/assess")
     public QuoteAssessmentResponse assess(
-            @RequestParam String marketCity,
-            @RequestParam String marketRegion,
-            @RequestParam String marketCountry,
-            @RequestParam String provider,
-            @RequestParam String rideType,
+            @RequestParam @NotBlank @Size(max = 120) String marketCity,
+            @RequestParam @NotBlank @Size(max = 120) String marketRegion,
+            @RequestParam @NotBlank @Size(max = 80) String marketCountry,
+            @RequestParam @Pattern(regexp = "(?i)Uber|Lyft|Waymo|Tesla") String provider,
+            @RequestParam @NotBlank @Size(max = 80) String rideType,
             @RequestParam @Positive double quotedPrice,
             @RequestParam(defaultValue = "30") @Min(1) @Max(365) int days,
             @RequestParam(required = false) @Positive Double distanceMiles,
             @RequestParam(required = false) @Positive Double travelMinutes,
-            @RequestParam(required = false) String originZone,
-            @RequestParam(required = false) String destinationZone
+            @RequestParam(required = false) @Size(max = 120) String originZone,
+            @RequestParam(required = false) @Size(max = 120) String destinationZone
     ) {
         return service.assess(
                 marketCity,

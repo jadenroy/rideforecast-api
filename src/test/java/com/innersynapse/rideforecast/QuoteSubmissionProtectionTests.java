@@ -19,6 +19,7 @@ import java.util.concurrent.Future;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 @SpringBootTest(properties = "rideforecast.submissions.max-per-minute=3")
@@ -154,6 +155,18 @@ class QuoteSubmissionProtectionTests {
                 .andExpect(header().string("X-RateLimit-Remaining", "0"))
                 .andExpect(header().exists("Retry-After"))
                 .andExpect(jsonPath("$.code").value("RATE_LIMITED"));
+    }
+
+    @Test
+    void rejectsOversizedAndUnsupportedBenchmarkQueries() throws Exception {
+        mvc.perform(get("/v1/quotes/benchmark")
+                        .queryParam("marketCity", "A".repeat(121))
+                        .queryParam("marketRegion", "NM")
+                        .queryParam("marketCountry", "US")
+                        .queryParam("provider", "Unknown")
+                        .queryParam("rideType", "Standard"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("INVALID_REQUEST"));
     }
 
     @Test

@@ -12,6 +12,7 @@ import org.springframework.stereotype.Component;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.time.Instant;
 
 @Component
 public class FirebaseAdminTokenVerifier implements FirebaseTokenVerifier {
@@ -28,8 +29,12 @@ public class FirebaseAdminTokenVerifier implements FirebaseTokenVerifier {
     @Override
     public VerifiedIdentity verify(String idToken) {
         try {
-            FirebaseToken token = firebaseAuth().verifyIdToken(idToken);
-            return new VerifiedIdentity(token.getUid());
+            FirebaseToken token = firebaseAuth().verifyIdToken(idToken, true);
+            Object authenticationTime = token.getClaims().get("auth_time");
+            Instant authenticatedAt = authenticationTime instanceof Number seconds
+                    ? Instant.ofEpochSecond(seconds.longValue())
+                    : Instant.EPOCH;
+            return new VerifiedIdentity(token.getUid(), authenticatedAt);
         } catch (FirebaseAuthException exception) {
             throw new InvalidAuthenticationException("INVALID_AUTH_TOKEN", "Your sign-in expired or could not be verified.");
         }

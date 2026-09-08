@@ -58,6 +58,7 @@ public class ApiExceptionHandler {
     ResponseEntity<ApiErrorResponse> invalidAuthentication(InvalidAuthenticationException exception) {
         HttpStatus status = exception.getCode().equals("AUTH_REQUIRED")
                 || exception.getCode().equals("INVALID_AUTH_TOKEN")
+                || exception.getCode().equals("REAUTHENTICATION_REQUIRED")
                 ? HttpStatus.UNAUTHORIZED
                 : HttpStatus.CONFLICT;
         return ResponseEntity.status(status).body(ApiErrorResponse.of(exception.getCode(), exception.getMessage()));
