@@ -18,10 +18,23 @@ class WebCorsTests {
             .perform(options("/v1/quotes")
                 .header("Origin", "https://rideforecast.app")
                 .header("Access-Control-Request-Method", "POST")
-                .header("Access-Control-Request-Headers", "content-type,idempotency-key"))
+                .header("Access-Control-Request-Headers", "content-type,idempotency-key,authorization"))
             .andExpect(status().isOk())
             .andExpect(header().string("Access-Control-Allow-Origin", "https://rideforecast.app"))
-            .andExpect(header().string("Access-Control-Allow-Headers", org.hamcrest.Matchers.containsStringIgnoringCase("idempotency-key")));
+            .andExpect(header().string("Access-Control-Allow-Headers", org.hamcrest.Matchers.containsStringIgnoringCase("idempotency-key")))
+            .andExpect(header().string("Access-Control-Allow-Headers", org.hamcrest.Matchers.containsStringIgnoringCase("authorization")));
+    }
+
+    @Test
+    void allowsProfileUpdatesFromBrandedProductionWeb() throws Exception {
+        MockMvcBuilders.webAppContextSetup(context).build()
+            .perform(options("/v1/profile")
+                .header("Origin", "https://rideforecast.app")
+                .header("Access-Control-Request-Method", "PUT")
+                .header("Access-Control-Request-Headers", "content-type,authorization"))
+            .andExpect(status().isOk())
+            .andExpect(header().string("Access-Control-Allow-Origin", "https://rideforecast.app"))
+            .andExpect(header().string("Access-Control-Allow-Methods", org.hamcrest.Matchers.containsString("PUT")));
     }
 
     @Test

@@ -6,6 +6,13 @@ import com.innersynapse.rideforecast.dto.QuoteObservationRequest;
 import com.innersynapse.rideforecast.dto.QuoteObservationResponse;
 import com.innersynapse.rideforecast.dto.QuoteSaveResult;
 import com.innersynapse.rideforecast.service.QuoteObservationService;
+import com.innersynapse.rideforecast.service.UserProfileService;
+import com.innersynapse.rideforecast.auth.AuthenticatedRequest;
+import com.innersynapse.rideforecast.auth.InvalidAuthenticationException;
+import com.innersynapse.rideforecast.auth.VerifiedIdentity;
+import com.innersynapse.rideforecast.model.UserProfile;
+import jakarta.servlet.http.HttpServletRequest;
+import org.springframework.beans.factory.annotation.Value;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
@@ -23,17 +30,29 @@ import java.util.List;
 public class QuoteObservationController {
 
     private final QuoteObservationService service;
+    private final UserProfileService profiles;
+    private final boolean allowAnonymousQuotes;
 
-    public QuoteObservationController(QuoteObservationService service) {
+    public QuoteObservationController(QuoteObservationService service, UserProfileService profiles,
+                                      @Value("${rideforecast.auth.allow-anonymous-quotes:true}") boolean allowAnonymousQuotes) {
         this.service = service;
+        this.profiles = profiles;
+        this.allowAnonymousQuotes = allowAnonymousQuotes;
     }
 
     @PostMapping
     public ResponseEntity<QuoteObservationResponse> create(
             @Valid @RequestBody QuoteObservationRequest request,
-            @RequestHeader(value = "Idempotency-Key", required = false) String idempotencyKey
+            @RequestHeader(value = "Idempotency-Key", required = false) String idempotencyKey,
+            HttpServletRequest httpRequest
     ) {
-        QuoteSaveResult result = service.save(request, idempotencyKey);
+        VerifiedIdentity identity = AuthenticatedRequest.optional(httpRequest);
+        UserProfile profile = identity == null ? null : profiles.find(identity.uid()).orElseThrow(() ->
+                new InvalidAuthenticationException("PROFILE_REQUIRED", "Complete your RideForecast profile before saving a quote."));
+        if (profile == null && !allowAnonymousQuotes) {
+            throw new InvalidAuthenticationException("AUTH_REQUIRED", "Sign in to save a quote to RideForecast.");
+        }
+        QuoteSaveResult result = service.save(request, idempotencyKey, profile == null ? null : profile.getId());
         return ResponseEntity
                 .status(result.replayed() ? HttpStatus.OK : HttpStatus.CREATED)
                 .header("Idempotency-Replayed", Boolean.toString(result.replayed()))

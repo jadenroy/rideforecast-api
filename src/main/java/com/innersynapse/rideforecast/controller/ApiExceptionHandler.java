@@ -2,6 +2,8 @@ package com.innersynapse.rideforecast.controller;
 
 import com.innersynapse.rideforecast.dto.ApiErrorResponse;
 import com.innersynapse.rideforecast.exception.InvalidQuoteSubmissionException;
+import com.innersynapse.rideforecast.exception.ProfileNotFoundException;
+import com.innersynapse.rideforecast.auth.InvalidAuthenticationException;
 import jakarta.validation.ConstraintViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -22,9 +24,12 @@ public class ApiExceptionHandler {
         exception.getBindingResult().getFieldErrors().forEach(error ->
                 fields.putIfAbsent(error.getField(), error.getDefaultMessage())
         );
+        boolean profileRequest = exception.getBindingResult().getObjectName().equals("userProfileRequest");
         return ResponseEntity.badRequest().body(new ApiErrorResponse(
-                "INVALID_QUOTE",
-                "Check the highlighted quote details and try again.",
+                profileRequest ? "INVALID_PROFILE" : "INVALID_QUOTE",
+                profileRequest
+                        ? "Check the highlighted profile details and try again."
+                        : "Check the highlighted quote details and try again.",
                 fields,
                 null
         ));
@@ -47,5 +52,20 @@ public class ApiExceptionHandler {
                 exception.getCode(),
                 exception.getMessage()
         ));
+    }
+
+    @ExceptionHandler(InvalidAuthenticationException.class)
+    ResponseEntity<ApiErrorResponse> invalidAuthentication(InvalidAuthenticationException exception) {
+        HttpStatus status = exception.getCode().equals("AUTH_REQUIRED")
+                || exception.getCode().equals("INVALID_AUTH_TOKEN")
+                ? HttpStatus.UNAUTHORIZED
+                : HttpStatus.CONFLICT;
+        return ResponseEntity.status(status).body(ApiErrorResponse.of(exception.getCode(), exception.getMessage()));
+    }
+
+    @ExceptionHandler(ProfileNotFoundException.class)
+    ResponseEntity<ApiErrorResponse> profileNotFound(ProfileNotFoundException exception) {
+        return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                .body(ApiErrorResponse.of("PROFILE_NOT_FOUND", exception.getMessage()));
     }
 }
