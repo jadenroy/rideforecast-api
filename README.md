@@ -70,7 +70,7 @@ Optional: `days`, `distanceMiles`, `travelMinutes`, `originZone`, `destinationZo
 
 When enough comparable observations exist, RideForecast prefers the same local market plus similar trip distance/duration (and zones when supplied). If there are too few similar trips, the response explicitly labels the result as a market-only fallback.
 
-The expected range currently uses the 25th to 75th percentile of observed quotes.
+The descriptive range uses the 25th to 75th percentile of eligible USD observations only after the beta gates pass: at least 20 observations, with the newest no more than 7 days old. Empty, insufficient, and stale samples return null statistics with their actual count and observation dates. See [BENCHMARK_POLICY.md](BENCHMARK_POLICY.md) for response fields, currency validation, historical-data handling, limitations, and rollout order.
 
 ### Quote assessment
 
@@ -83,7 +83,7 @@ Adds `quotedPrice` to the benchmark request and returns one of:
 - `ABOVE_LOCAL_NORM`
 - `INSUFFICIENT_DATA`
 
-The API also returns the percent difference from the local median, observation count, comparison scope, and confidence level.
+When eligible, the API returns the percent difference from the observed median, count, and comparison scope. Confidence is not inferred from count (`NOT_ESTIMATED`). Inadequate or stale samples receive `INSUFFICIENT_DATA` without a percentage or local-norm verdict; their actual count and freshness metadata remain available.
 
 ## Important product framing
 

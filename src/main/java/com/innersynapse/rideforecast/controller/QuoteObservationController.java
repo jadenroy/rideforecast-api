@@ -73,6 +73,7 @@ public class QuoteObservationController {
 
     @GetMapping("/benchmark")
     public MarketBenchmarkResponse benchmark(
+            @RequestParam(defaultValue = "USD") @Pattern(regexp = "(?i)USD", message = "must be USD during the beta") String currency,
             @RequestParam @NotBlank @Size(max = 120) String marketCity,
             @RequestParam @NotBlank @Size(max = 120) String marketRegion,
             @RequestParam @NotBlank @Size(max = 80) String marketCountry,
@@ -100,6 +101,7 @@ public class QuoteObservationController {
 
     @GetMapping("/assess")
     public QuoteAssessmentResponse assess(
+            @RequestParam(defaultValue = "USD") @Pattern(regexp = "(?i)USD", message = "must be USD during the beta") String currency,
             @RequestParam @NotBlank @Size(max = 120) String marketCity,
             @RequestParam @NotBlank @Size(max = 120) String marketRegion,
             @RequestParam @NotBlank @Size(max = 80) String marketCountry,

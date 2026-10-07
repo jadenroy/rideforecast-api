@@ -1,5 +1,7 @@
 package com.innersynapse.rideforecast.dto;
 
+import java.time.Instant;
+
 public record MarketBenchmarkResponse(
         String marketCity,
         String marketRegion,
@@ -18,6 +20,13 @@ public record MarketBenchmarkResponse(
         Double medianPrice,
         Double expectedHigh,
         Double maximumPrice,
-        String confidence
+        String confidence,
+        String currency,
+        String dataStatus,
+        int minimumObservations,
+        int maxLatestObservationAgeDays,
+        Instant asOf,
+        Instant oldestObservedAt,
+        Instant latestObservedAt
 ) {
 }
