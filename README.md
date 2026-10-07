@@ -6,7 +6,13 @@ Spring Boot backend for RideForecast, served through `api.innersynapse.com`.
 
 ### Health
 
-`GET /health`
+`GET /health` and `GET /v1/ready`
+
+Both routes acquire a database connection and run a bounded read against `quote_observations`. An empty table is ready. An unavailable database or missing quote table returns `503`, `Retry-After: 5`, and a generic status without connection details; a successful check returns `200` with `status: "ok"` and `database: "ready"`. Responses use `Cache-Control: no-store`.
+
+The existing Render `/health` probe now reflects database readiness. The web client uses `/v1/ready` through the existing browser CORS policy. Connection acquisition is limited to five seconds and the query to two seconds. This verifies quote-table access, not every query or write path; check the real read endpoints after a release as well.
+
+For a read-only release check, request `/health`, `/v1/ready`, `/v1/quotes/benchmark`, `/v1/quotes/assess`, and `/v1/quotes/recent` with an existing public market. Confirm HTTP status, USD/evidence metadata, and CORS for the canonical frontend. Record first-request and subsequent request durations separately. Do not write synthetic observations to production or infer a cold start solely from a slow response. Free-service inactivity can still cause startup delay; this change adds truthful status and retry behavior without an upgrade or background keepalive.
 
 ### Simulated ride prices
 
