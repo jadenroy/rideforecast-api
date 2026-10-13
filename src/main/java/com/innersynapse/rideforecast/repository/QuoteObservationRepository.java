@@ -3,16 +3,20 @@ package com.innersynapse.rideforecast.repository;
 import com.innersynapse.rideforecast.model.QuoteObservation;
 import org.springframework.data.jpa.repository.JpaRepository;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
 public interface QuoteObservationRepository extends JpaRepository<QuoteObservation, UUID> {
 
-    List<QuoteObservation> findByMarketKeyAndProviderIgnoreCaseAndRideTypeIgnoreCaseOrderByObservedAtDesc(
+    List<QuoteObservation> findByMarketKeyAndProviderIgnoreCaseAndRideTypeIgnoreCaseAndCurrencyIgnoreCaseAndObservedAtBetweenOrderByObservedAtDesc(
             String marketKey,
             String provider,
-            String rideType
+            String rideType,
+            String currency,
+            Instant cutoff,
+            Instant asOf
     );
 
     List<QuoteObservation> findTop100ByMarketKeyOrderByObservedAtDesc(String marketKey);

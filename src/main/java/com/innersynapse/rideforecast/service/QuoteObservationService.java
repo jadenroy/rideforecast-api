@@ -30,6 +30,9 @@ import java.util.regex.Pattern;
 public class QuoteObservationService {
 
     private static final Pattern IDEMPOTENCY_KEY = Pattern.compile("[A-Za-z0-9._:-]{8,100}");
+    // Conservative beta display gates, not statistical confidence guarantees.
+    public static final int MINIMUM_OBSERVATIONS = 20;
+    public static final int MAX_LATEST_OBSERVATION_AGE_DAYS = 7;
 
     private final QuoteObservationRepository repository;
 
@@ -38,6 +41,9 @@ public class QuoteObservationService {
     }
 
     public QuoteSaveResult save(QuoteObservationRequest request, String requestedIdempotencyKey, UUID ownerId) {
+        if (!"USD".equalsIgnoreCase(request.currency())) {
+            throw new InvalidQuoteSubmissionException("UNSUPPORTED_CURRENCY", "Only USD quotes are accepted during the beta.");
+        }
         if (request.website() != null && !request.website().isBlank()) {
             throw new InvalidQuoteSubmissionException(
                     "AUTOMATED_SUBMISSION_REJECTED",
@@ -196,17 +202,18 @@ public class QuoteObservationService {
     ) {
         int boundedDays = Math.max(1, Math.min(days, 365));
         String marketKey = marketKey(marketCity, marketRegion, marketCountry);
-        Instant cutoff = Instant.now().minus(boundedDays, ChronoUnit.DAYS);
+        Instant asOf = Instant.now();
+        Instant cutoff = asOf.minus(boundedDays, ChronoUnit.DAYS);
 
         List<QuoteObservation> marketObservations = repository
-                .findByMarketKeyAndProviderIgnoreCaseAndRideTypeIgnoreCaseOrderByObservedAtDesc(
+                .findByMarketKeyAndProviderIgnoreCaseAndRideTypeIgnoreCaseAndCurrencyIgnoreCaseAndObservedAtBetweenOrderByObservedAtDesc(
                         marketKey,
                         provider,
-                        rideType
-                )
-                .stream()
-                .filter(item -> !item.getObservedAt().isBefore(cutoff))
-                .toList();
+                        rideType,
+                        "USD",
+                        cutoff,
+                        asOf
+                );
 
         String comparisonScope = "MARKET_ONLY";
         List<QuoteObservation> observations = marketObservations;
@@ -226,7 +233,7 @@ public class QuoteObservationService {
                     ))
                     .toList();
 
-            if (similar.size() >= 3) {
+            if (similar.size() >= MINIMUM_OBSERVATIONS) {
                 observations = similar;
                 comparisonScope = "MARKET_AND_SIMILAR_TRIP";
             } else {
@@ -234,7 +241,14 @@ public class QuoteObservationService {
             }
         }
 
-        if (observations.isEmpty()) {
+        Instant latestObservedAt = observations.isEmpty() ? null : observations.getFirst().getObservedAt();
+        Instant oldestObservedAt = observations.isEmpty() ? null : observations.getLast().getObservedAt();
+        String dataStatus = observations.isEmpty() ? "NO_DATA"
+                : observations.size() < MINIMUM_OBSERVATIONS ? "INSUFFICIENT_DATA"
+                : latestObservedAt.isBefore(asOf.minus(MAX_LATEST_OBSERVATION_AGE_DAYS, ChronoUnit.DAYS))
+                ? "STALE_DATA" : "AVAILABLE";
+
+        if (!"AVAILABLE".equals(dataStatus)) {
             return new MarketBenchmarkResponse(
                     normalizeDisplay(marketCity),
                     normalizeDisplay(marketRegion),
@@ -243,7 +257,7 @@ public class QuoteObservationService {
                     normalizeDisplay(provider),
                     normalizeDisplay(rideType),
                     boundedDays,
-                    0,
+                    observations.size(),
                     distanceMiles,
                     travelMinutes,
                     comparisonScope,
@@ -253,7 +267,14 @@ public class QuoteObservationService {
                     null,
                     null,
                     null,
-                    "NO_DATA"
+                    "NO_DATA".equals(dataStatus) ? "NO_DATA" : "NOT_ESTIMATED",
+                    "USD",
+                    dataStatus,
+                    MINIMUM_OBSERVATIONS,
+                    MAX_LATEST_OBSERVATION_AGE_DAYS,
+                    asOf,
+                    oldestObservedAt,
+                    latestObservedAt
             );
         }
 
@@ -285,7 +306,14 @@ public class QuoteObservationService {
                 money(median),
                 money(q3),
                 money(maximum),
-                confidence(observations.size())
+                "NOT_ESTIMATED",
+                "USD",
+                dataStatus,
+                MINIMUM_OBSERVATIONS,
+                MAX_LATEST_OBSERVATION_AGE_DAYS,
+                asOf,
+                oldestObservedAt,
+                latestObservedAt
         );
     }
 
@@ -315,20 +343,27 @@ public class QuoteObservationService {
                 destinationZone
         );
 
-        if (benchmark.observationCount() == 0 || benchmark.medianPrice() == null) {
+        if (!"AVAILABLE".equals(benchmark.dataStatus()) || benchmark.medianPrice() == null) {
             return new QuoteAssessmentResponse(
                     normalizeDisplay(provider),
                     normalizeDisplay(rideType),
                     money(quotedPrice),
                     benchmark.marketKey(),
-                    0,
+                    benchmark.observationCount(),
                     null,
                     null,
                     null,
                     null,
                     "INSUFFICIENT_DATA",
-                    "NO_DATA",
-                    benchmark.comparisonScope()
+                    benchmark.confidence(),
+                    benchmark.comparisonScope(),
+                    benchmark.currency(),
+                    benchmark.dataStatus(),
+                    benchmark.minimumObservations(),
+                    benchmark.maxLatestObservationAgeDays(),
+                    benchmark.asOf(),
+                    benchmark.oldestObservedAt(),
+                    benchmark.latestObservedAt()
             );
         }
 
@@ -355,7 +390,14 @@ public class QuoteObservationService {
                 money(percentVsMedian),
                 assessment,
                 benchmark.confidence(),
-                benchmark.comparisonScope()
+                benchmark.comparisonScope(),
+                benchmark.currency(),
+                benchmark.dataStatus(),
+                benchmark.minimumObservations(),
+                benchmark.maxLatestObservationAgeDays(),
+                benchmark.asOf(),
+                benchmark.oldestObservedAt(),
+                benchmark.latestObservedAt()
         );
     }
 
@@ -450,13 +492,6 @@ public class QuoteObservationService {
         }
         double weight = index - lower;
         return sorted.get(lower) * (1 - weight) + sorted.get(upper) * weight;
-    }
-
-    private String confidence(long count) {
-        if (count >= 50) return "HIGH";
-        if (count >= 15) return "MEDIUM";
-        if (count >= 5) return "LOW";
-        return "VERY_LOW";
     }
 
     private double money(double value) {

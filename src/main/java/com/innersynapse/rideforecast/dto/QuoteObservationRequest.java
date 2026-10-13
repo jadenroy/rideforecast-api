@@ -15,7 +15,7 @@ public record QuoteObservationRequest(
         String provider,
         @NotBlank @Size(max = 80) String rideType,
         @DecimalMin(value = "0.01") @DecimalMax(value = "10000.00") double quotedPrice,
-        @NotBlank @Pattern(regexp = "[A-Za-z]{3}", message = "must be a three-letter currency code")
+        @NotBlank @Pattern(regexp = "(?i)USD", message = "must be USD during the beta")
         String currency,
         @NotNull @DecimalMin("-90.0") @DecimalMax("90.0") Double originLatitude,
         @NotNull @DecimalMin("-180.0") @DecimalMax("180.0") Double originLongitude,
