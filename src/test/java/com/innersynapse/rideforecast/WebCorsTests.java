@@ -6,11 +6,23 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.web.context.WebApplicationContext;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.options;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 @SpringBootTest
 class WebCorsTests {
     @Autowired WebApplicationContext context;
+
+    @Test
+    void browserReadinessUsesTheDatabaseAndExistingCorsAllowlist() throws Exception {
+        MockMvcBuilders.webAppContextSetup(context).build()
+            .perform(get("/v1/ready").header("Origin", "https://rideforecast.app"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.status").value("ok"))
+            .andExpect(jsonPath("$.database").value("ready"))
+            .andExpect(header().string("Cache-Control", "no-store"))
+            .andExpect(header().string("Access-Control-Allow-Origin", "https://rideforecast.app"));
+    }
 
     @Test
     void allowsQuoteSubmissionFromBrandedProductionWeb() throws Exception {
