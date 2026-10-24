@@ -8,7 +8,8 @@ public record ProviderPolicy(
         String id, String name, Capability endpointCapability,
         Permission productionAccess, Permission comparisonPermission,
         Permission retentionPermission, Permission trainingPermission,
-        List<Coverage> coverage, Evidence evidence) {
+        List<Coverage> coverage, Evidence evidence,
+        @com.fasterxml.jackson.annotation.JsonIgnore java.util.Map<ProviderPermissionGrants.Right, ProviderPermissionGrants.Grant> permissionGrants) {
     public enum Capability { DOCUMENTED, UNVERIFIED }
     public enum Permission { APPROVED, UNVERIFIED, RESTRICTED }
     /** Explicit approved rectangle. Split antimeridian-crossing coverage into separate rectangles. */
@@ -40,7 +41,20 @@ public record ProviderPolicy(
     }
     public record Evidence(String url, Instant reviewedAt, Instant validUntil, String note) {}
 
-    public ProviderPolicy { coverage = List.copyOf(coverage); }
+    public ProviderPolicy { coverage = List.copyOf(coverage); permissionGrants = java.util.Map.copyOf(permissionGrants); }
+
+    /** Legacy summaries and research evidence alone cannot authorize an adapter. */
+    public ProviderPolicy(String id, String name, Capability endpointCapability,
+            Permission productionAccess, Permission comparisonPermission, Permission retentionPermission,
+            Permission trainingPermission, List<Coverage> coverage, Evidence evidence) {
+        this(id, name, endpointCapability, productionAccess, comparisonPermission, retentionPermission,
+            trainingPermission, coverage, evidence, java.util.Map.of());
+    }
+
+    public List<String> permissionBlockers(Instant now, Coverage scope) {
+        return ProviderPermissionGrants.blockers(id, permissionGrants,
+            ProviderPermissionGrants.liveComparisonRights(), scope, now);
+    }
 
     public List<String> blockers(Instant now) {
         var reasons = new java.util.ArrayList<String>();

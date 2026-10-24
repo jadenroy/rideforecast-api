@@ -10,7 +10,8 @@ public final class ProviderGateway {
     public record Result(String status, List<String> reasons, List<ProviderAdapter.Fare> fares) {}
 
     public Result fetch(ProviderPolicy policy, ProviderAdapter adapter, ProviderAdapter.Query query) {
-        var blockers = policy.blockers(clock.instant());
+        var startedAt = clock.instant();
+        var blockers = policy.blockers(startedAt);
         if (!blockers.isEmpty()) return unavailable(blockers);
         if (query == null || query.trip() == null) return unavailable(List.of("INVALID_TRIP"));
         var trip = query.trip();
@@ -26,11 +27,15 @@ public final class ProviderGateway {
                 || !geography.contains(trip.destinationLatitude(), trip.destinationLongitude())) {
             return unavailable(List.of("OUTSIDE_APPROVED_GEOGRAPHY"));
         }
+        var permissionBlockers = policy.permissionBlockers(startedAt, query.coverage());
+        if (!permissionBlockers.isEmpty()) return unavailable(permissionBlockers);
         if (adapter == null || !policy.id().equals(adapter.providerId())) return unavailable(List.of("ADAPTER_NOT_CONFIGURED"));
         try {
             var fares = adapter.fetch(query);
             var now = clock.instant();
             if (!policy.blockers(now).isEmpty()) return unavailable(List.of("APPROVAL_EXPIRED"));
+            var refreshedPermissionBlockers = policy.permissionBlockers(now, query.coverage());
+            if (!refreshedPermissionBlockers.isEmpty()) return unavailable(refreshedPermissionBlockers);
             if (fares == null || fares.isEmpty()) return unavailable(List.of("NO_FARES"));
             for (var fare : fares) {
                 if (fare == null || !policy.id().equals(fare.providerId())
