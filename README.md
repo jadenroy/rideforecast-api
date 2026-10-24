@@ -35,10 +35,19 @@ may require an empty-state update before use. No fabricated fallback or zero-dol
 `ProviderAdapter` defines transient normalized fares with provider, product, market, currency,
 amount, direct/partner provenance, source reference, fetch time and expiry. `ProviderGateway`
 checks documented capability, production/comparison approval, dated unexpired evidence and exact
-coverage before calling an adapter, then rejects invalid or stale results. Retention and training
+coverage before calling an adapter, then rejects invalid or stale results. Coverage includes explicit
+approved geographic rectangles: both pickup and destination must be finite, valid coordinates inside
+the approved bounds, regardless of caller market labels. Route distance and duration must be finite
+and positive. Non-monetary ISO codes (including XXX and XTS) are rejected. Rectangles must be wholly
+within approved territory; an irregular area requires a stricter provider-specific resolver before
+an adapter is introduced. Endpoint containment does not establish permission for an entire route.
+Retention and training
 are separate permissions and are not implied by comparison approval. No provider data is persisted,
 cached, logged or used for training here. Research links are evidence of investigation, not grants.
 There are no production adapters and no public adapter-execution route in this increment.
+The current policy has one shared evidence record and expiry for production/comparison approval;
+it does not implement independent evidence or expiry scopes for each permission. Separate grants
+must be modeled and verified before enabling retention or training.
 
 Before adding one: obtain written rights covering the specific use and markets, record reviewed
 approval scope/expiry (without publishing private agreements), implement timeouts and provider-specific

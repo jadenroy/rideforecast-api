@@ -15,8 +15,10 @@ import static org.mockito.Mockito.*;
 class ProviderGatewayTests {
     private final Instant now = Instant.parse("2026-10-24T12:00:00Z");
     private final ProviderGateway gateway = new ProviderGateway(Clock.fixed(now, ZoneOffset.UTC));
-    private final ProviderPolicy.Coverage scope = new ProviderPolicy.Coverage("synthetic-market", "test-product", "USD");
-    private final ProviderAdapter.Query query = new ProviderAdapter.Query(scope, null);
+    private final ProviderPolicy.Geography geography = new ProviderPolicy.Geography(-1, -1, 1, 1);
+    private final com.innersynapse.rideforecast.dto.PriceRequest trip = new com.innersynapse.rideforecast.dto.PriceRequest(0, 0, 0.01, 0.01, "Synthetic", 1, 3, null);
+    private final ProviderPolicy.Coverage scope = new ProviderPolicy.Coverage("synthetic-market", "test-product", "USD", geography);
+    private final ProviderAdapter.Query query = new ProviderAdapter.Query(scope, trip);
     private final ProviderAdapter adapter = mock(ProviderAdapter.class);
 
     private ProviderPolicy policy(ProviderPolicy.Permission production, ProviderPolicy.Permission comparison, Instant expiry) {
@@ -50,10 +52,10 @@ class ProviderGatewayTests {
     }
 
     @Test void scopeMustMatchMarketProductAndCurrencyBeforeCalls() {
-        for (var coverage : List.of(new ProviderPolicy.Coverage("other", scope.product(), "USD"),
-                new ProviderPolicy.Coverage(scope.market(), "other", "USD"),
-                new ProviderPolicy.Coverage(scope.market(), scope.product(), "EUR"))) {
-            assertThat(gateway.fetch(approved(), adapter, new ProviderAdapter.Query(coverage, null)).reasons())
+        for (var coverage : List.of(new ProviderPolicy.Coverage("other", scope.product(), "USD", geography),
+                new ProviderPolicy.Coverage(scope.market(), "other", "USD", geography),
+                new ProviderPolicy.Coverage(scope.market(), scope.product(), "EUR", geography))) {
+            assertThat(gateway.fetch(approved(), adapter, new ProviderAdapter.Query(coverage, trip)).reasons())
                 .contains("UNSUPPORTED_MARKET_PRODUCT_CURRENCY");
         }
         verifyNoInteractions(adapter);
@@ -113,5 +115,44 @@ class ProviderGatewayTests {
         when(adapter.providerId()).thenReturn("fixture");
         when(adapter.fetch(query)).thenReturn(List.of(validFare()));
         assertThat(new ProviderGateway(clock).fetch(approved(), adapter, query).reasons()).containsExactly("APPROVAL_EXPIRED");
+    }
+
+    @Test void invalidCoordinatesAndMetricsNeverReachAnAdapter() {
+        for (double invalid : new double[] {Double.NaN, Double.POSITIVE_INFINITY, Double.NEGATIVE_INFINITY, 999, -999}) {
+            var invalidTrips = List.of(
+                new com.innersynapse.rideforecast.dto.PriceRequest(invalid, 0, 0, 0, "Synthetic", 1, 3, null),
+                new com.innersynapse.rideforecast.dto.PriceRequest(0, invalid, 0, 0, "Synthetic", 1, 3, null),
+                new com.innersynapse.rideforecast.dto.PriceRequest(0, 0, invalid, 0, "Synthetic", 1, 3, null),
+                new com.innersynapse.rideforecast.dto.PriceRequest(0, 0, 0, invalid, "Synthetic", 1, 3, null));
+            for (var invalidTrip : invalidTrips) {
+                assertThat(gateway.fetch(approved(), adapter, new ProviderAdapter.Query(scope, invalidTrip)).reasons()).containsExactly("INVALID_TRIP");
+            }
+        }
+        for (double invalid : new double[] {Double.NaN, Double.POSITIVE_INFINITY, 0, -1}) {
+            var invalidTrip = new com.innersynapse.rideforecast.dto.PriceRequest(0, 0, 0.01, 0.01, "Synthetic", invalid, invalid, null);
+            assertThat(gateway.fetch(approved(), adapter, new ProviderAdapter.Query(scope, invalidTrip)).reasons()).containsExactly("INVALID_TRIP");
+        }
+        assertThat(gateway.fetch(approved(), adapter, new ProviderAdapter.Query(scope, null)).reasons()).containsExactly("INVALID_TRIP");
+        verifyNoInteractions(adapter);
+    }
+
+    @Test void approvedLabelsCannotAuthorizeCoordinatesOutsideApprovedTerritory() {
+        for (var outside : List.of(
+                new com.innersynapse.rideforecast.dto.PriceRequest(2, 0, 0, 0, "Synthetic", 1, 3, null),
+                new com.innersynapse.rideforecast.dto.PriceRequest(0, 0, 0, 2, "Synthetic", 1, 3, null))) {
+            assertThat(gateway.fetch(approved(), adapter, new ProviderAdapter.Query(scope, outside)).reasons()).containsExactly("OUTSIDE_APPROVED_GEOGRAPHY");
+        }
+        var forged = new ProviderPolicy.Coverage(scope.market(), scope.product(), scope.currency(), new ProviderPolicy.Geography(-90, -180, 90, 180));
+        assertThat(gateway.fetch(approved(), adapter, new ProviderAdapter.Query(forged, trip)).reasons()).containsExactly("UNSUPPORTED_MARKET_PRODUCT_CURRENCY");
+        verifyNoInteractions(adapter);
+    }
+
+    @Test void nonMonetaryCurrencyAndInvalidGeographicScopesAreRejected() {
+        for (var currency : List.of("XXX", "XTS", "XAU", "usd", "ZZZ")) {
+            org.assertj.core.api.Assertions.assertThatThrownBy(() -> new ProviderPolicy.Coverage("market", "product", currency, geography))
+                .isInstanceOf(IllegalArgumentException.class);
+        }
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> new ProviderPolicy.Geography(Double.NaN, -1, 1, 1)).isInstanceOf(IllegalArgumentException.class);
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> new ProviderPolicy.Geography(-1, 170, 1, -170)).isInstanceOf(IllegalArgumentException.class);
     }
 }

@@ -11,13 +11,31 @@ public record ProviderPolicy(
         List<Coverage> coverage, Evidence evidence) {
     public enum Capability { DOCUMENTED, UNVERIFIED }
     public enum Permission { APPROVED, UNVERIFIED, RESTRICTED }
-    public record Coverage(String market, String product, String currency) {
+    /** Explicit approved rectangle. Split antimeridian-crossing coverage into separate rectangles. */
+    public record Geography(double south, double west, double north, double east) {
+        public Geography {
+            if (!validPoint(south, west) || !validPoint(north, east) || south >= north || west >= east) {
+                throw new IllegalArgumentException("Valid non-empty geographic bounds are required");
+            }
+        }
+        public boolean contains(double latitude, double longitude) {
+            return validPoint(latitude, longitude) && latitude >= south && latitude <= north
+                && longitude >= west && longitude <= east;
+        }
+        public static boolean validPoint(double latitude, double longitude) {
+            return Double.isFinite(latitude) && Double.isFinite(longitude)
+                && latitude >= -90 && latitude <= 90 && longitude >= -180 && longitude <= 180;
+        }
+    }
+    public record Coverage(String market, String product, String currency, Geography geography) {
         public Coverage {
             if (market == null || market.isBlank() || product == null || product.isBlank()
-                    || currency == null || !currency.matches("[A-Z]{3}")) {
-                throw new IllegalArgumentException("Explicit market, product and ISO currency are required");
+                    || currency == null || !currency.matches("[A-Z]{3}") || geography == null) {
+                throw new IllegalArgumentException("Explicit market, product, currency and geography are required");
             }
-            java.util.Currency.getInstance(currency);
+            if (java.util.Currency.getInstance(currency).getDefaultFractionDigits() < 0) {
+                throw new IllegalArgumentException("A monetary ISO currency is required");
+            }
         }
     }
     public record Evidence(String url, Instant reviewedAt, Instant validUntil, String note) {}
