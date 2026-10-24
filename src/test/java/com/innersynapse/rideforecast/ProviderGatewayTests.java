@@ -115,4 +115,3 @@ class ProviderGatewayTests {
         assertThat(new ProviderGateway(clock).fetch(approved(), adapter, query).reasons()).containsExactly("APPROVAL_EXPIRED");
     }
 }
-
