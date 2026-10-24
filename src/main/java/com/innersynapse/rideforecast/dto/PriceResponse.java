@@ -6,5 +6,8 @@ import java.util.List;
 public record PriceResponse(
         String source,
         Instant fetchedAt,
-        List<RidePriceDto> rides
+        List<RidePriceDto> rides,
+        String status,
+        String reason,
+        String availabilityUrl
 ) {}

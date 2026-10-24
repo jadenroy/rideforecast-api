@@ -14,11 +14,37 @@ The existing Render `/health` probe now reflects database readiness. The web cli
 
 For a read-only release check, request `/health`, `/v1/ready`, `/v1/quotes/benchmark`, `/v1/quotes/assess`, and `/v1/quotes/recent` with an existing public market. Confirm HTTP status, USD/evidence metadata, and CORS for the canonical frontend. Record first-request and subsequent request durations separately. Do not write synthetic observations to production or infer a cold start solely from a slow response. Free-service inactivity can still cause startup delay; this change adds truthful status and retry behavior without an upgrade or background keepalive.
 
-### Simulated ride prices
+### Provider availability and legacy prices
+
+`GET /v1/providers` reports the non-exhaustive provider registry, separate endpoint capability,
+production access, comparison/retention/training permissions, reviewed evidence and approved
+market/product/currency coverage. All entries currently return `UNAVAILABLE`; no live fare
+integration is configured or approved. This status is independent of quote database readiness.
+The endpoint needs no location and returns `Cache-Control: no-store`.
 
 `POST /v1/prices`
 
-Returns the current server-side simulated Uber/Lyft prices for a trip.
+The old formula-generated Uber/Lyft prices have been removed. This legacy endpoint retains
+`source`, `fetchedAt`, and `rides`, but returns an empty `rides` array, `source: "unavailable"`,
+`status: "UNAVAILABLE"`, `reason: "NO_APPROVED_PROVIDER_INTEGRATION"`, and
+`availabilityUrl: "/v1/providers"`. Its timestamp is response time, not an upstream fare timestamp.
+HTTP 200 means the request was handled, not that fares are available. Clients must handle empty
+results. The current web observation flow does not call this endpoint; the frozen Swift prototype
+may require an empty-state update before use. No fabricated fallback or zero-dollar fare is emitted.
+
+`ProviderAdapter` defines transient normalized fares with provider, product, market, currency,
+amount, direct/partner provenance, source reference, fetch time and expiry. `ProviderGateway`
+checks documented capability, production/comparison approval, dated unexpired evidence and exact
+coverage before calling an adapter, then rejects invalid or stale results. Retention and training
+are separate permissions and are not implied by comparison approval. No provider data is persisted,
+cached, logged or used for training here. Research links are evidence of investigation, not grants.
+There are no production adapters and no public adapter-execution route in this increment.
+
+Before adding one: obtain written rights covering the specific use and markets, record reviewed
+approval scope/expiry (without publishing private agreements), implement timeouts and provider-specific
+normalization, validate in an approved sandbox, then connect the web availability and fare UI.
+An API key or sandbox account alone cannot enable comparisons. Existing user observations remain
+separate historical evidence and are never substituted for live API fares.
 
 ### Log an observed quote
 
