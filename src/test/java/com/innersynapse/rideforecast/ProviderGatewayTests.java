@@ -7,6 +7,7 @@ import org.junit.jupiter.params.provider.EnumSource;
 import java.math.BigDecimal;
 import java.time.*;
 import java.util.List;
+import java.util.Map;
 import static com.innersynapse.rideforecast.provider.ProviderPolicy.Capability.DOCUMENTED;
 import static com.innersynapse.rideforecast.provider.ProviderPolicy.Permission.*;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -23,7 +24,11 @@ class ProviderGatewayTests {
 
     private ProviderPolicy policy(ProviderPolicy.Permission production, ProviderPolicy.Permission comparison, Instant expiry) {
         return new ProviderPolicy("fixture", "Offline fixture", DOCUMENTED, production, comparison,
-            UNVERIFIED, UNVERIFIED, List.of(scope), new ProviderPolicy.Evidence("https://example.test/approval", now.minusSeconds(60), expiry, "Synthetic test only"));
+            UNVERIFIED, UNVERIFIED, List.of(scope), new ProviderPolicy.Evidence("https://example.test/approval", now.minusSeconds(60), expiry, "Synthetic test only"),
+            Map.of(ProviderPermissionGrants.Right.PRODUCTION_ACCESS,
+                new ProviderPermissionGrants.Grant("fixture", production, "offline-production-evidence", now.minusSeconds(60), now.minusSeconds(60), expiry, null, List.of(scope)),
+                ProviderPermissionGrants.Right.COMPARISON,
+                new ProviderPermissionGrants.Grant("fixture", comparison, "offline-comparison-evidence", now.minusSeconds(60), now.minusSeconds(60), expiry, null, List.of(scope))));
     }
     private ProviderPolicy approved() { return policy(APPROVED, APPROVED, now.plusSeconds(600)); }
     private ProviderAdapter.Fare fare(String market, String currency, Instant fetched, Instant expires, String provenance) {
@@ -42,6 +47,31 @@ class ProviderGatewayTests {
     void apiAccessDoesNotGrantComparisonPermission(ProviderPolicy.Permission permission) {
         assertThat(gateway.fetch(policy(APPROVED, permission, now.plusSeconds(60)), adapter, query).reasons()).contains("COMPARISON_NOT_APPROVED");
         verifyNoInteractions(adapter);
+    }
+
+    @Test void approvedLegacySummaryWithoutIndependentGrantsCannotReachAnAdapter() {
+        var legacy = new ProviderPolicy("fixture", "Offline fixture", DOCUMENTED, APPROVED, APPROVED,
+            UNVERIFIED, UNVERIFIED, List.of(scope), new ProviderPolicy.Evidence("https://example.test/research", now, now.plusSeconds(600), "Research is not a grant"));
+        assertThat(gateway.fetch(legacy, adapter, query).reasons())
+            .containsExactly("GRANT_PRODUCTION_ACCESS_MISSING_INVALID_OR_EXPIRED", "GRANT_COMPARISON_MISSING_INVALID_OR_EXPIRED");
+        verifyNoInteractions(adapter);
+    }
+
+    @Test void comparisonGrantExpiringDuringAnUpstreamCallDiscardsTheFare() {
+        var clock = mock(Clock.class);
+        when(clock.instant()).thenReturn(now, now.plusSeconds(2));
+        var original = approved();
+        var grants = new java.util.HashMap<>(original.permissionGrants());
+        grants.put(ProviderPermissionGrants.Right.COMPARISON, new ProviderPermissionGrants.Grant("fixture", APPROVED,
+            "offline-short-approval", now, now, now.plusSeconds(1), null, List.of(scope)));
+        var policy = new ProviderPolicy(original.id(), original.name(), original.endpointCapability(), original.productionAccess(),
+            original.comparisonPermission(), original.retentionPermission(), original.trainingPermission(), original.coverage(), original.evidence(), grants);
+        grants.clear();
+        when(adapter.providerId()).thenReturn("fixture");
+        when(adapter.fetch(query)).thenReturn(List.of(validFare()));
+        assertThat(new ProviderGateway(clock).fetch(policy, adapter, query).reasons())
+            .containsExactly("GRANT_COMPARISON_MISSING_INVALID_OR_EXPIRED");
+        verify(adapter).fetch(query);
     }
 
     @Test void missingOrExpiredApprovalPreventsCalls() {
