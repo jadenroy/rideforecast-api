@@ -13,6 +13,21 @@ permissions:
 jobs:
   test:
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        # Official 18-alpine manifest verified against its SHA-256 on 2026-10-25.
+        image: postgres:18-alpine@sha256:898c60cb390d1085bc97bdd6a1ae968757421df394b071848b52b1c09c89d6a5
+        env:
+          POSTGRES_DB: rf027_ci
+          # Password-free trust is ONLY for this job's disposable synthetic fixture.
+          POSTGRES_HOST_AUTH_METHOD: trust
+        ports:
+          - 127.0.0.1:55432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d rf027_ci"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
 
     steps:
       - name: Checkout
@@ -27,3 +42,15 @@ jobs:
 
       - name: Run tests
         run: mvn --batch-mode test
+
+      - name: Verify quote privacy and ownership on PostgreSQL
+        # Explicit fixture-only connection; no repository secrets or production URLs.
+        env:
+          JDBC_DATABASE_URL: jdbc:postgresql://127.0.0.1:55432/rf027_ci
+          DB_USERNAME: postgres
+          DB_PASSWORD: ''
+          JPA_DDL_AUTO: create-drop
+        run: >-
+          mvn --batch-mode -Drf027.postgres.required=true
+          -Duser.timezone=Pacific/Honolulu
+          -Dtest=PostgresQuoteInsertTests,QuoteInsertPrivacyTests,QuoteSubmissionProtectionTests,ProfileAuthenticationTests,QuoteReplayOwnershipTests test
