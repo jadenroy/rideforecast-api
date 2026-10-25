@@ -8,7 +8,7 @@ import com.innersynapse.rideforecast.dto.QuoteSaveResult;
 import com.innersynapse.rideforecast.exception.InvalidQuoteSubmissionException;
 import com.innersynapse.rideforecast.model.QuoteObservation;
 import com.innersynapse.rideforecast.repository.QuoteObservationRepository;
-import org.springframework.dao.DataIntegrityViolationException;
+import com.innersynapse.rideforecast.repository.QuoteInsertConflictException;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
@@ -98,8 +98,8 @@ public class QuoteObservationService {
         );
 
         try {
-            return new QuoteSaveResult(toResponse(repository.saveAndFlush(observation)), false);
-        } catch (DataIntegrityViolationException conflict) {
+            return new QuoteSaveResult(toResponse(repository.insert(observation)), false);
+        } catch (QuoteInsertConflictException conflict) {
             QuoteObservation concurrent = repository.findBySubmissionKey(submissionKey)
                     .orElseThrow(() -> conflict);
             return replay(concurrent, fingerprint, ownerId);

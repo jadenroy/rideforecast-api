@@ -7,7 +7,7 @@ import com.innersynapse.rideforecast.repository.QuoteObservationRepository;
 import com.innersynapse.rideforecast.service.QuoteObservationService;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
-import org.springframework.dao.DataIntegrityViolationException;
+import com.innersynapse.rideforecast.repository.QuoteInsertConflictException;
 
 import java.time.Instant;
 import java.util.Optional;
@@ -21,6 +21,26 @@ class QuoteReplayOwnershipTests {
     private static final UUID ALICE = UUID.fromString("00000000-0000-0000-0000-000000000001");
     private static final UUID BOB = UUID.fromString("00000000-0000-0000-0000-000000000002");
 
+    @org.junit.jupiter.api.Test
+    void unrelatedFailureCannotBeConvertedIntoReplay() {
+        var repository = mock(QuoteObservationRepository.class);
+        var service = new QuoteObservationService(repository);
+        var failure = new org.springframework.dao.DataIntegrityViolationException("unrelated diagnostic");
+        when(repository.insert(any())).thenThrow(failure);
+        assertThatThrownBy(() -> service.save(payload(), "synthetic-replay-key", ALICE)).isSameAs(failure);
+        verify(repository, times(1)).findBySubmissionKey(any());
+    }
+
+    @org.junit.jupiter.api.Test
+    void uniqueFailureWithoutMatchingSubmissionIsNotReplay() {
+        var repository = mock(QuoteObservationRepository.class);
+        var service = new QuoteObservationService(repository);
+        var failure = new QuoteInsertConflictException();
+        when(repository.insert(any())).thenThrow(failure);
+        assertThatThrownBy(() -> service.save(payload(), "synthetic-replay-key", ALICE)).isSameAs(failure);
+        verify(repository, times(2)).findBySubmissionKey(any());
+    }
+
     @ParameterizedTest
     @CsvSource({"alice,bob", "alice,guest", "guest,alice"})
     void rejectsCrossOwnerReplayOnBothLookupPaths(String original, String retry) {
@@ -28,15 +48,15 @@ class QuoteReplayOwnershipTests {
             for (String key : new String[]{"synthetic-replay-key", null}) {
                 var repository = mock(QuoteObservationRepository.class);
                 var service = new QuoteObservationService(repository);
-                when(repository.saveAndFlush(any())).thenAnswer(call -> call.getArgument(0));
+                when(repository.insert(any())).thenAnswer(call -> call.getArgument(0));
                 service.save(payload(), key, owner(original));
                 var captor = org.mockito.ArgumentCaptor.forClass(QuoteObservation.class);
-                verify(repository).saveAndFlush(captor.capture());
+                verify(repository).insert(captor.capture());
                 var stored = captor.getValue();
                 reset(repository);
                 if (concurrent) {
                     when(repository.findBySubmissionKey(any())).thenReturn(Optional.empty(), Optional.of(stored));
-                    when(repository.saveAndFlush(any())).thenThrow(new DataIntegrityViolationException("synthetic conflict"));
+                    when(repository.insert(any())).thenThrow(new QuoteInsertConflictException());
                 } else {
                     when(repository.findBySubmissionKey(any())).thenReturn(Optional.of(stored));
                 }
@@ -44,7 +64,7 @@ class QuoteReplayOwnershipTests {
                         .isInstanceOfSatisfying(InvalidQuoteSubmissionException.class,
                                 error -> assertThat(error.getCode()).isEqualTo("IDEMPOTENCY_KEY_REUSED"));
                 assertThat(stored.getOwnerId()).isEqualTo(owner(original));
-                if (!concurrent) verify(repository, never()).saveAndFlush(any());
+                if (!concurrent) verify(repository, never()).insert(any());
             }
         }
     }
@@ -55,15 +75,15 @@ class QuoteReplayOwnershipTests {
         for (String key : new String[]{"synthetic-replay-key", null}) {
             var repository = mock(QuoteObservationRepository.class);
             var service = new QuoteObservationService(repository);
-            when(repository.saveAndFlush(any())).thenAnswer(call -> call.getArgument(0));
+            when(repository.insert(any())).thenAnswer(call -> call.getArgument(0));
             var first = service.save(payload(), key, owner(original));
             var captor = org.mockito.ArgumentCaptor.forClass(QuoteObservation.class);
-            verify(repository).saveAndFlush(captor.capture());
+            verify(repository).insert(captor.capture());
             when(repository.findBySubmissionKey(any())).thenReturn(Optional.of(captor.getValue()));
             var replay = service.save(payload(), key, owner(original));
             assertThat(replay.replayed()).isTrue();
             assertThat(replay.observation()).isEqualTo(first.observation());
-            verify(repository, times(1)).saveAndFlush(any());
+            verify(repository, times(1)).insert(any());
         }
     }
 

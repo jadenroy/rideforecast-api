@@ -8,7 +8,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
-public interface QuoteObservationRepository extends JpaRepository<QuoteObservation, UUID> {
+public interface QuoteObservationRepository extends JpaRepository<QuoteObservation, UUID>, QuoteObservationInsert {
 
     List<QuoteObservation> findByMarketKeyAndProviderIgnoreCaseAndRideTypeIgnoreCaseAndCurrencyIgnoreCaseAndObservedAtBetweenOrderByObservedAtDesc(
             String marketKey,
