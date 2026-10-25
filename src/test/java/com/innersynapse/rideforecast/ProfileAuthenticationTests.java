@@ -172,6 +172,34 @@ class ProfileAuthenticationTests {
                 .andExpect(content().string(""));
     }
 
+    @Test
+    void quoteRetryCannotCrossAuthenticatedAccounts() throws Exception {
+        for (String token : new String[]{"jaden-token", "other-token"}) {
+            mvc.perform(put("/v1/profile").header("Authorization", "Bearer " + token)
+                            .contentType(MediaType.APPLICATION_JSON).content(profileBody("Synthetic", "Test City")))
+                    .andExpect(status().isOk());
+        }
+        String body = quoteBody();
+        String key = "synthetic-owner-boundary";
+        mvc.perform(post("/v1/quotes").header("Authorization", "Bearer jaden-token")
+                        .header("Idempotency-Key", key).contentType(MediaType.APPLICATION_JSON).content(body))
+                .andExpect(status().isCreated());
+        mvc.perform(post("/v1/quotes").header("Authorization", "Bearer other-token")
+                        .header("Idempotency-Key", key).contentType(MediaType.APPLICATION_JSON).content(body))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("IDEMPOTENCY_KEY_REUSED"))
+                .andExpect(jsonPath("$.id").doesNotExist())
+                .andExpect(jsonPath("$.ownerId").doesNotExist());
+        mvc.perform(get("/v1/profile/quotes").header("Authorization", "Bearer other-token"))
+                .andExpect(status().isOk()).andExpect(content().json("[]"));
+        mvc.perform(post("/v1/quotes").header("Authorization", "Bearer jaden-token")
+                        .header("Idempotency-Key", key).contentType(MediaType.APPLICATION_JSON).content(body))
+                .andExpect(status().isOk());
+        assertThat(quotes.count()).isEqualTo(1);
+        assertThat(quotes.findAll().getFirst().getOwnerId())
+                .isEqualTo(profiles.findByFirebaseUid("firebase-jaden").orElseThrow().getId());
+    }
+
     private String profileBody(String preferredName, String city) {
         return """
                 {"preferredName":"%s","homeCity":"%s","homeRegion":"NM","homeCountry":"US",
