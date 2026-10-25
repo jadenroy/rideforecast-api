@@ -11,12 +11,14 @@ import com.innersynapse.rideforecast.exception.InvalidQuoteSubmissionException;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.BeforeEach;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.dao.DataIntegrityViolationException;
 
 import java.time.Instant;
+import javax.sql.DataSource;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.CopyOnWriteArrayList;
@@ -30,6 +32,12 @@ import static org.assertj.core.api.Assertions.*;
 @SpringBootTest
 class QuoteInsertPrivacyTests {
     @Autowired QuoteObservationRepository repository;
+    @Autowired DataSource dataSource;
+
+    @BeforeEach
+    void verifyDatabaseWhenPostgresIsRequired() throws Exception {
+        PostgresTestDatabase.assertRequiredDatabase(dataSource);
+    }
 
     @ParameterizedTest
     @CsvSource({"same,false", "same,true", "different,false", "account-guest,false", "guest-account,false"})

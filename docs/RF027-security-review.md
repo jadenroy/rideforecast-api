@@ -18,6 +18,16 @@ Local validation on Java 21 / Maven 3.9.11: `mvn -o --batch-mode test` passed **
 
 This patch covers the expected unique-conflict application/framework path under normal production log levels. Database-server error logs can still contain constraint values; JDBC wire/parameter tracing, unrelated database errors, access/edge logs and broader log redaction remain separate work. No claim of complete log privacy is made. RF-027 stays In progress with rows 117/121 Partial; RF-026 actual speech remains Partial. Parent independent review and exact-head CI are required before release.
 
+### Authorized isolated PostgreSQL CI validation
+
+The local storage failure above is historical, not evidence of PostgreSQL behavior. The follow-up adds a disposable PostgreSQL service to the existing Ubuntu CI job while retaining `contents: read`, the existing action pins, and the full H2 suite. It uses only synthetic data in `rf027_ci`, bound to host loopback `127.0.0.1:55432`; password-free trust exists only inside this ephemeral fixture. No secrets, production connections, existing service configuration, paid runners or permission expansion are introduced.
+
+The official Docker registry's `library/postgres:18-alpine` manifest was fetched and its raw SHA-256 verified as `898c60cb390d1085bc97bdd6a1ae968757421df394b071848b52b1c09c89d6a5` on 2026-10-25. The Linux AMD64 child is `3b0ef735388b2cb097fc29b8bb421d86d57d0ddbe7aa1fbd6493e06d65028503`. CI pins the manifest digest, not a floating tag alone. No image layers were downloaded locally.
+
+A separate Maven invocation requires PostgreSQL product name, major version 18, exact loopback JDBC URL and database name. It runs `PostgresQuoteInsertTests`, `QuoteInsertPrivacyTests`, `QuoteSubmissionProtectionTests`, `ProfileAuthenticationTests` and `QuoteReplayOwnershipTests`. The privacy tests assert the database identity before their real collision/log/ownership/payload/diagnostic checks, preventing silent H2 fallback. New tests compare all 23 fields after insert/read, including nullable fields, UUID owner, Unicode text and microsecond instants originating from different offsets. This run sets the JVM timezone to Pacific/Honolulu to exercise conversion independently of the UTC database configuration. HTTP tests use only the existing synthetic token verifier. Other benchmark tests keep their deliberately explicit H2 fixture in the full default suite.
+
+Remote CI results are required on the new exact head before release; adding the fixture alone is not a passing integration result. Database-server logs remain outside this application-log fix, and synthetic PostgreSQL CI is not a production environment or load test.
+
 ## Scope and acceptance
 
 Reviewed web `290ab28174b159833fc010633e698446f18687a0` and API `500164124fb4b2476703c5a7b00b08517114d184`. Fresh clones matched remote main. Prior RF-026 owner was idle after PR49 release; all 13 open PRs were dependency updates. No repository AGENTS.md or .agents instructions were found. Render readback confirmed web `dep-dbesbheq1p3s73ei9qvg` and API `dep-dbeeq6mq1p3s73e6iuf0` live on these refs. This is source analysis and synthetic testing, not a production penetration test or live settings certification.
