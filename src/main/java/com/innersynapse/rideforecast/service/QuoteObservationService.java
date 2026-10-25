@@ -23,6 +23,7 @@ import java.util.Comparator;
 import java.util.HexFormat;
 import java.util.List;
 import java.util.Locale;
+import java.util.Objects;
 import java.util.UUID;
 import java.util.regex.Pattern;
 
@@ -67,7 +68,7 @@ public class QuoteObservationService {
 
         QuoteObservation existing = repository.findBySubmissionKey(submissionKey).orElse(null);
         if (existing != null) {
-            return replay(existing, fingerprint);
+            return replay(existing, fingerprint, ownerId);
         }
 
         QuoteObservation observation = new QuoteObservation(
@@ -101,16 +102,19 @@ public class QuoteObservationService {
         } catch (DataIntegrityViolationException conflict) {
             QuoteObservation concurrent = repository.findBySubmissionKey(submissionKey)
                     .orElseThrow(() -> conflict);
-            return replay(concurrent, fingerprint);
+            return replay(concurrent, fingerprint, ownerId);
         }
     }
 
-    private QuoteSaveResult replay(QuoteObservation existing, String fingerprint) {
-        if (existing.getSubmissionFingerprint() != null
-                && !existing.getSubmissionFingerprint().equals(fingerprint)) {
+    private QuoteSaveResult replay(QuoteObservation existing, String fingerprint, UUID ownerId) {
+        // A retry must belong to the same account (or the same anonymous namespace).
+        // Apply this to both lookup paths, including a database uniqueness race.
+        if (!Objects.equals(existing.getOwnerId(), ownerId)
+                || (existing.getSubmissionFingerprint() != null
+                && !existing.getSubmissionFingerprint().equals(fingerprint))) {
             throw new InvalidQuoteSubmissionException(
                     "IDEMPOTENCY_KEY_REUSED",
-                    "This submission key was already used for different quote details."
+                    "This submission key cannot be reused for this request."
             );
         }
         return new QuoteSaveResult(toResponse(existing), true);
